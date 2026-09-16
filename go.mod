@@ -1,4 +1,4 @@
-module changeme
+module ffmpeg-gui
 
 go 1.25.0
 

@@ -30,7 +30,7 @@ import * as $models from "./models.js";
  *   - false 表示目前沒有可取消的轉換，或無法將取消指令寫入 FFmpeg 的標準輸入
  */
 export function CancelConversion(): $CancellablePromise<boolean> {
-    return $Call.ByID(3898173166);
+    return $Call.ByID(603568877);
 }
 
 /**
@@ -38,7 +38,7 @@ export function CancelConversion(): $CancellablePromise<boolean> {
  *   - 函式會使用互斥鎖保護共享狀態，避免在其他 goroutine 修改狀態時讀取到不一致的資料
  */
 export function GetConversionState(): $CancellablePromise<$models.ConversionState> {
-    return $Call.ByID(2081234533);
+    return $Call.ByID(447325734);
 }
 
 /**
@@ -53,5 +53,5 @@ export function GetConversionState(): $CancellablePromise<$models.ConversionStat
  *   - 轉換失敗時，回傳空的 ConversionResult 與錯誤訊息
  */
 export function StartConversion(options: $models.ConversionOptions): $CancellablePromise<$models.ConversionResult> {
-    return $Call.ByID(1384565672, options);
+    return $Call.ByID(2954419465, options);
 }

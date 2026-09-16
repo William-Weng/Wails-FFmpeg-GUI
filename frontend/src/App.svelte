@@ -14,7 +14,7 @@
   import {
     StartConversion,
     CancelConversion,
-  } from "../bindings/changeme/ffmpegservice";
+  } from "../bindings/ffmpeg-gui/backend/ffmpegservice";
 
   type FFmpegOutput = {
     line: string;

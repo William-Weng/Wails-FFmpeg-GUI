@@ -3,6 +3,8 @@ package main
 import (
 	"embed"
 
+	"ffmpeg-gui/backend"
+
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 )
@@ -15,7 +17,7 @@ func main() {
 	var app *application.App
 
 	// 1. 初始化服務實體
-	ffmpegService := NewFFmpegService()
+	ffmpegService := backend.NewFFmpegService()
 
 	// 2. 建立 Wails v3 應用程式並綁定服務
 	app = application.New(application.Options{
@@ -26,9 +28,12 @@ func main() {
 		Services: []application.Service{
 			application.NewService(ffmpegService),
 		},
+		Mac: application.MacOptions{
+			ApplicationShouldTerminateAfterLastWindowClosed: true,
+		},
 	})
 
-	ffmpegService.app = app // 將 app 實例傳遞給服務
+	ffmpegService.App = app // 將 app 實例傳遞給服務
 
 	// 3. 核心修正：使用 v3 最新 API 建立視窗
 	app.Window.NewWithOptions(application.WebviewWindowOptions{

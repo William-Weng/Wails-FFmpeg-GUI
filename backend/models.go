@@ -1,4 +1,4 @@
-package main
+package backend
 
 import (
 	"io"
@@ -43,7 +43,7 @@ type ConversionState struct {
 
 // FFmpegService 封裝 FFmpeg 轉換流程與狀態管理
 type FFmpegService struct {
-	app        *application.App // app 是 Wails 應用程式的實例；可用來和 Wails 的事件系統或應用程式生命週期互動
+	App        *application.App // app 是 Wails 應用程式的實例；可用來和 Wails 的事件系統或應用程式生命週期互動
 	mutex      sync.Mutex       // mu 用來保護下方的共享狀態；由於 FFmpeg 可能在背景 goroutine 中執行，因此需要使用 Mutex 避免多個 goroutine 同時讀寫造成資料競爭
 	running    bool             // running 表示目前是否有 FFmpeg 轉換工作正在執行
 	cancelling bool             // cancelling 表示目前是否正在處理取消操作；例如：已收到取消要求，但 FFmpeg 程序尚未完全結束

@@ -1,4 +1,4 @@
-package main
+package backend
 
 import (
 	"context"
@@ -18,7 +18,7 @@ import (
 // ServiceStartup 是 Wails v3 的服務啟動生命週期勾子
 //   - Wails 啟動應用程式時會呼叫此方法；這裡會取得目前的 Wails App 實例，讓 FFmpegService 後續可以透過 app 發送事件給前端
 func (service *FFmpegService) ServiceStartup(ctx context.Context) error {
-	service.app = application.Get()
+	service.App = application.Get()
 	return nil
 }
 
@@ -194,12 +194,12 @@ func (service *FFmpegService) clearRunningState() {
 //   - 有 Wails App 時，函式會發送 "ffmpeg:output" 事件，並將訊息包裝成 FFmpegOutput 結構，讓前端可以接收
 func (service *FFmpegService) emitOutput(line string) {
 
-	if service.app == nil {
+	if service.App == nil {
 		fmt.Println(line)
 		return
 	}
 
-	service.app.Event.Emit("ffmpeg:output", FFmpegOutput{Line: line})
+	service.App.Event.Emit("ffmpeg:output", FFmpegOutput{Line: line})
 }
 
 // 從 reader 逐字元讀取 FFmpeg 的輸出內容，每次只從 reader 讀取一個字元
@@ -348,11 +348,11 @@ func (service *FFmpegService) beginConversion() error {
 // commandContext 取得用來執行 FFmpeg 命令的 Context；如果 FFmpegService 沒有關聯 Wails App，則回傳 context.Background()
 func (service *FFmpegService) commandContext() context.Context {
 
-	if service.app == nil {
+	if service.App == nil {
 		return context.Background()
 	}
 
-	return service.app.Context()
+	return service.App.Context()
 }
 
 // 根據轉換選項建立 FFmpeg 命令；函式會準備 FFmpeg 執行檔路徑、輸出路徑和命令列參數，並回傳尚未啟動的 *exec.Cmd
