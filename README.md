@@ -11,6 +11,8 @@
 
 目前主要以 macOS 開發與測試，提供 FFmpeg 指令預覽、複製與影片轉換功能，方便在圖形化介面與 Terminal 指令之間切換。
 
+https://github.com/user-attachments/assets/8e047444-9d79-4a04-91e2-d6666c0ba09f
+
 ## 功能特色
 
 - 透過圖形化介面設定輸入與輸出影片。
