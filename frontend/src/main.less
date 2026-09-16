@@ -1,0 +1,463 @@
+/* =========================================================
+   Global
+   ========================================================= */
+
+:root {
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "SF Pro Display",
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+
+  color: #f5f5f5;
+  background: #2d2d2d;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  overflow: hidden;
+  background: #2d2d2d;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button,
+select {
+  cursor: pointer;
+}
+
+/* =========================================================
+   Main Window
+   ========================================================= */
+
+.window {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  background: #2d2d2d;
+}
+
+/* =========================================================
+   Drop Zone
+   ========================================================= */
+
+.drop-zone {
+  display: flex;
+  width: auto;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  margin: 10px 18px 18px;
+  padding: 28px 48px 24px;
+  overflow: hidden;
+  border: 3px dashed #999999;
+  border-radius: 4px;
+  background: #2e2e2e;
+
+  &:hover {
+    border-color: #bbbbbb;
+  }
+
+  &.drag-active {
+    border-color: #239ff0;
+    background: #343b40;
+  }
+}
+
+/* =========================================================
+   Form Layout
+   ========================================================= */
+
+.form-area {
+  display: flex;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0 auto;
+}
+
+.form-row {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 14px;
+
+  &.ffmpeg-row {
+    margin-bottom: 8px;
+  }
+
+  &.file-row {
+    min-width: 0;
+    margin-bottom: 18px;
+    white-space: nowrap;
+  }
+}
+
+.option-row {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  color: #eeeeee;
+  font-size: 20px;
+}
+
+.options-grid {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: 256px 360px;
+  column-gap: 8px;
+  row-gap: 4px;
+  justify-content: start;
+}
+
+/* =========================================================
+   Text Inputs
+   ========================================================= */
+
+.text-input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: 48px;
+  padding: 0 22px;
+  border: 1px solid transparent;
+  border-radius: 13px;
+  outline: none;
+  color: #f5f5f5;
+  background: #1d1d1d;
+  box-shadow:
+    inset 0 1px 1px #101010,
+    0 1px 2px #242424;
+  font-size: 18px;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+
+  &::placeholder {
+    color: #999999;
+  }
+
+  &:focus {
+    border-color: #2868bd;
+    box-shadow:
+      0 0 0 2px rgba(35, 128, 235, 0.35),
+      inset 0 1px 1px #101010;
+  }
+
+  &.ffmpeg-input,
+  &.file-input {
+    flex: 1 1 auto;
+  }
+
+  &.file-input {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* =========================================================
+   Select Controls
+   ========================================================= */
+
+.select-input {
+  flex: 0 0 112px;
+  width: 112px;
+  height: 48px;
+  padding: 0 12px;
+  border: 1px solid #3f3f3f;
+  border-radius: 8px;
+  outline: none;
+  color: #f5f5f5;
+  background: linear-gradient(
+    to bottom,
+    #777777 0%,
+    #555555 47%,
+    #2d2d2d 52%,
+    #474747 100%
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 1px 2px #191919;
+  font-size: 17px;
+
+  &:focus {
+    border-color: #2868bd;
+    box-shadow:
+      0 0 0 2px rgba(35, 128, 235, 0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
+}
+
+/* =========================================================
+   Convert Button
+   ========================================================= */
+
+.convert-button {
+  width: 98px;
+  height: 48px;
+  border: 0;
+  border-radius: 13px;
+  flex: 0 0 98px;
+  color: #ffffff;
+  background: #3cab48;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 1px 2px #202020;
+  font-size: 17px;
+  font-weight: 600;
+  transition:
+    background-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.1s ease,
+    opacity 0.2s ease;
+
+  &:hover:not(:disabled) {
+    background: #48bf55;
+  }
+
+  &.converting {
+    color: #ffffff;
+    background: #c84b4b;
+
+    &:hover:not(:disabled) {
+      background: #d85a5a;
+    }
+
+    &:active:not(:disabled) {
+      transform: translateY(1px);
+      background: #ad3d3d;
+    }
+  }
+
+  &.cancelling,
+  &.cancelling:disabled {
+    cursor: wait;
+    opacity: 1;
+    color: #ffffff;
+    background: #a66a22;
+  }
+
+  &:disabled:not(.cancelling) {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+}
+
+/* =========================================================
+   Checkbox and Labels
+   ========================================================= */
+
+.check-label {
+  display: flex;
+  width: 92px;
+  flex: 0 0 92px;
+  align-items: center;
+  gap: 12px;
+  color: #eeeeee;
+  white-space: nowrap;
+
+  input {
+    width: 22px;
+    height: 22px;
+    margin: 0;
+    accent-color: #199ff2;
+    cursor: pointer;
+  }
+
+  span {
+    line-height: 1;
+  }
+}
+
+/* =========================================================
+   Number and Time Inputs
+   ========================================================= */
+
+.number-input {
+  width: 145px;
+  height: 48px;
+  padding: 0 20px;
+  border: 1px solid transparent;
+  border-radius: 13px;
+  outline: none;
+  color: #f5f5f5;
+  background: #1d1d1d;
+  box-shadow:
+    inset 0 1px 1px #101010,
+    0 1px 2px #242424;
+  font-size: 18px;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+
+  &.time {
+    width: 145px;
+  }
+
+  &:focus {
+    border-color: #2868bd;
+    box-shadow:
+      0 0 0 2px rgba(35, 128, 235, 0.35),
+      inset 0 1px 1px #101010;
+  }
+
+  &:disabled {
+    color: #777777;
+    background: #242424;
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+}
+
+.separator {
+  display: inline-flex;
+  width: 16px;
+  align-items: center;
+  justify-content: center;
+  color: #aaaaaa;
+  font-size: 25px;
+}
+
+/* =========================================================
+   Log Panel
+   ========================================================= */
+
+.log-panel {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  margin: 4px 0 0;
+  padding: 18px 14px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  border: 0;
+  border-radius: 13px;
+  color: #eeeeee;
+  background: #1d1d1d;
+  box-shadow:
+    inset 0 1px 1px #101010,
+    0 1px 2px #242424;
+  font-family:
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Monaco,
+    Consolas,
+    "Liberation Mono",
+    monospace;
+  font-size: 15px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* =========================================================
+   Scrollbar
+   ========================================================= */
+
+.drop-zone,
+.log-panel {
+  &::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  &::-webkit-scrollbar-track {
+    border-radius: 5px;
+    background: #242424;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    border: 2px solid #242424;
+    border-radius: 5px;
+    background: #666666;
+
+    &:hover {
+      background: #888888;
+    }
+  }
+}
+
+/* =========================================================
+   Narrow Window
+   ========================================================= */
+
+@media (max-width: 900px) {
+  .drop-zone {
+    margin: 10px;
+    padding: 32px 28px;
+  }
+
+  .file-row {
+    gap: 10px;
+  }
+
+  .select-input {
+    flex-basis: 96px;
+    width: 96px;
+  }
+
+  .convert-button {
+    flex-basis: 86px;
+    width: 86px;
+  }
+}
+
+/* =========================================================
+   Very Narrow Window
+   ========================================================= */
+
+@media (max-width: 760px) {
+  .drop-zone {
+    padding: 24px 18px;
+  }
+
+  .file-row {
+    flex-wrap: wrap;
+  }
+
+  .file-input {
+    flex-basis: 100%;
+  }
+
+  .check-label {
+    width: 82px;
+    flex-basis: 82px;
+  }
+}
