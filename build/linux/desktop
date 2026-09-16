@@ -1,13 +1,13 @@
 [Desktop Entry]
 Version=1.0
-Name=My Product
-Comment=A ffmpeg-converter application
+Name=FFmpeg GUI
+Comment=使用 FFmpeg 的跨平台影片格式轉換工具
 # The Exec line includes %u to pass the URL to the application
-Exec=/usr/local/bin/ffmpeg-converter %u
+Exec=/usr/local/bin/FFmpeg-GUI %u
 Terminal=false
 Type=Application
-Icon=ffmpeg-converter
+Icon=FFmpeg-GUI
 Categories=Utility;
-StartupWMClass=ffmpeg-converter
+StartupWMClass=FFmpeg-GUI
 
  

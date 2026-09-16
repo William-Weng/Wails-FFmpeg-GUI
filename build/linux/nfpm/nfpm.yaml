@@ -3,26 +3,26 @@
 #
 # The lines below are called `modelines`. See `:help modeline`
 
-name: "ffmpeg-converter"
+name: "FFmpeg-GUI"
 arch: ${GOARCH}
 platform: "linux"
 version: "0.1.0"
 section: "default"
 priority: "extra"
 maintainer: ${GIT_COMMITTER_NAME} <${GIT_COMMITTER_EMAIL}>
-description: "A ffmpeg-converter application"
-vendor: "My Company"
+description: "使用 FFmpeg 的跨平台影片格式轉換工具"
+vendor: "William Weng"
 homepage: "https://wails.io"
 license: "MIT"
 release: "1"
 
 contents:
-  - src: "./bin/ffmpeg-converter"
-    dst: "/usr/local/bin/ffmpeg-converter"
+  - src: "./bin/FFmpeg-GUI"
+    dst: "/usr/local/bin/FFmpeg-GUI"
   - src: "./build/appicon.png"
-    dst: "/usr/share/icons/hicolor/128x128/apps/ffmpeg-converter.png"
-  - src: "./build/linux/ffmpeg-converter.desktop"
-    dst: "/usr/share/applications/ffmpeg-converter.desktop"
+    dst: "/usr/share/icons/hicolor/128x128/apps/FFmpeg-GUI.png"
+  - src: "./build/linux/FFmpeg-GUI.desktop"
+    dst: "/usr/share/applications/FFmpeg-GUI.desktop"
 
 # Default dependencies for the GTK4 + WebKitGTK 6.0 stack (Ubuntu 24.04+ / Debian 13+)
 depends:

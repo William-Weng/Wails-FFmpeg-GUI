@@ -213,17 +213,76 @@ wails3 task package
 
 ```text
 .
-├── build/                 # 建置資源與應用程式 icon
+├── build/                 # 跨平台建置資源、平台設定與應用程式 icon
+├── build/config.yml       # Wails 3 App 名稱、版本、Bundle ID 與建置設定
 ├── frontend/              # Svelte 5 frontend
-├── ffmpeg_service.go      # FFmpeg command 組合與執行
+├── ffmpeg_service.go      # FFmpeg command 組合、執行與輸出處理
 ├── main.go                # Wails application entry point
-├── go.mod                 # Go module 設定
-├── go.sum                 # Go dependencies checksum
-└── wails.json             # Wails 專案設定
+├── Taskfile.yml           # Wails 建置 tasks 與輸出檔名設定
+├── go.mod                 # Go module 定義與直接相依套件
+└── go.sum                 # Go dependencies checksum
 ```
 
-實際檔案名稱若與上述不同，請以專案目前結構為準。
+## 更換應用程式圖示
 
+Wails 3 以 `build/appicon.png` 作為主圖示來源，再產生 macOS、Windows、Linux、iOS 與 Android 等平台所需的圖示資源。
+
+### 圖示規格
+
+建議準備以下規格的 PNG：
+
+| 項目 | 建議 |
+| --- | --- |
+| 檔案格式 | PNG |
+| 檔案路徑 | `build/appicon.png` |
+| 圖片尺寸 | `1024 × 1024 px` |
+| 畫布比例 | 正方形 |
+| 背景 | 建議不透明 |
+| 安全邊距 | 主要圖案不要太貼近四周邊界 |
+
+> macOS 會自行套用 Dock 與 Finder 的圓角視覺效果，因此原始圖示建議保留完整正方形畫布，不需要預先裁成圓角。
+
+### 產生平台圖示
+
+在專案根目錄執行：
+
+```bash
+# 1. 覆蓋主 icon
+cp ~/Downloads/wails-ffmpeg-gui-icon.png build/appicon.png
+
+# 2. 依 appicon.png 產生各平台圖示
+wails3 generate icons -input build/appicon.png
+
+# 3. 更新各平台 build assets
+wails3 update build-assets
+
+# 4. 啟動開發模式測試
+wails3 dev
+
+# 5. 正式封裝 macOS Apple Silicon 版本
+wails3 package GOOS=darwin GOARCH=arm64
+```
+
+若要封裝 macOS Intel 版本：
+
+```bash
+wails3 package GOOS=darwin GOARCH=amd64
+```
+
+### macOS 顯示舊圖示
+
+macOS Finder 或 Dock 有時會暫存舊的 App icon。確認已重新產生並封裝 App 後，可先執行：
+
+```bash
+# 將路徑換成實際新產生的 .app 檔案
+touch "build/bin/ffmpeg-converter.app"
+
+# 重新啟動 Finder 與 Dock，刷新顯示的 icon
+killall Finder
+killall Dock
+```
+
+若仍顯示舊 icon，請確認目前啟動的是重新封裝後的新版 `.app`，而不是 Dock、桌面或其他資料夾中留下的舊版本。
 ## 開發筆記
 
 - 先確認產生的 FFmpeg command 可以在 Terminal 正常執行，再進行 GUI 內的實際轉換。

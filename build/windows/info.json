@@ -5,11 +5,11 @@
 	"info": {
 		"0000": {
 			"ProductVersion": "0.1.0",
-			"CompanyName": "My Company",
-			"FileDescription": "A ffmpeg-converter application",
-			"LegalCopyright": "© 2026, My Company",
-			"ProductName": "My Product",
-			"Comments": "This is a comment"
+			"CompanyName": "William Weng",
+			"FileDescription": "使用 FFmpeg 的跨平台影片格式轉換工具",
+			"LegalCopyright": "Copyright © 2026, William Weng",
+			"ProductName": "FFmpeg GUI",
+			"Comments": "Built with Wails, Go, Svelte and FFmpeg"
 		}
 	}
 }
