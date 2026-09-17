@@ -13,6 +13,7 @@
   import SizeOptionRow from "./components/SizeOptionRow.svelte";
 
   import { StartConversion, CancelConversion, GetVideoDuration } from "../bindings/ffmpeg-gui/backend/ffmpegservice";
+  import { Print } from "../bindings/ffmpeg-gui/backend/tools";
 
   let ffmpegPath = "/opt/homebrew/bin/ffmpeg";
   let inputPath = "";
@@ -89,6 +90,7 @@
    * @param event - 事件物件（通常來自 Events 系統）
    */
   async function videoFileDroppedAction(event: unknown): Promise<void> {
+
     const files = _getEventData<string[]>(event);
 
     if (!Array.isArray(files) || files.length === 0) {
@@ -230,6 +232,16 @@
       logText += `\n取消失敗：${String(error)}\n`;
       await _scrollLogToBottom();
     }
+  }
+
+  /**
+   * 將前端的日誌訊息傳送到 Go 後端，由後端印到終端
+   * 對應後端：backend.Tools.Print(log any)
+   *
+   * @param log - 要印出的訊息（字串或物件皆可）
+   */
+  function print(log: any) {
+    Print(log)
   }
 
   /**

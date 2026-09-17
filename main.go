@@ -18,6 +18,7 @@ func main() {
 
 	// 1. 初始化服務實體
 	ffmpegService := backend.NewFFmpegService()
+	tools := backend.NewTools()
 
 	// 2. 建立 Wails v3 應用程式並綁定服務
 	app = application.New(application.Options{
@@ -27,6 +28,7 @@ func main() {
 		},
 		Services: []application.Service{
 			application.NewService(ffmpegService),
+			application.NewService(tools),
 		},
 		Mac: application.MacOptions{
 			ApplicationShouldTerminateAfterLastWindowClosed: true,
