@@ -2,7 +2,7 @@
   import { onMount, tick } from "svelte";
   import { Events } from "@wailsio/runtime";
   import { WailsEventType, FFmpegEventType } from "./constants/events";
-  import type { FFmpegProgress } from "./constants/events";
+  import type { FFmpegOutput, FFmpegProgress } from "./constants/models";
 
   import FFmpegPathInput from "./components/FfmpegPathInput.svelte";
   import FilePathInput from "./components/FilePathInput.svelte";
@@ -12,15 +12,7 @@
   import TimeOptionRow from "./components/TimeOptionRow.svelte";
   import SizeOptionRow from "./components/SizeOptionRow.svelte";
 
-  import {
-    StartConversion,
-    CancelConversion,
-    GetVideoDuration,
-  } from "../bindings/ffmpeg-gui/backend/ffmpegservice";
-
-  type FFmpegOutput = {
-    line: string;
-  };
+  import { StartConversion, CancelConversion, GetVideoDuration } from "../bindings/ffmpeg-gui/backend/ffmpegservice";
 
   let ffmpegPath = "/opt/homebrew/bin/ffmpeg";
   let inputPath = "";
@@ -64,26 +56,17 @@
    * 取消所有事件訂閱，避免重新掛載元件後產生重複 listener。
    */
   onMount(() => {
-    const unsubscribeDrop = Events.On(
-      WailsEventType.VideoFileDropped,
-      (event) => {
-        videoFileDroppedAction(event);
-      },
-    );
+    const unsubscribeDrop = Events.On(WailsEventType.VideoFileDropped, (event) => {
+      videoFileDroppedAction(event);
+    });
 
-    const unsubscribeFFmpegOutput = Events.On(
-      FFmpegEventType.Output,
-      async (event) => {
-        await ffmpegOutputAction(event);
-      },
-    );
+    const unsubscribeFFmpegOutput = Events.On(FFmpegEventType.Output, async (event) => {
+      await ffmpegOutputAction(event);
+    });
 
-    const unsubscribeFFmpegProgress = Events.On(
-      FFmpegEventType.Progress,
-      (event) => {
-        ffmpegProgressAction(event);
-      },
-    );
+    const unsubscribeFFmpegProgress = Events.On(FFmpegEventType.Progress, (event) => {
+      ffmpegProgressAction(event);
+    });
 
     return () => {
       unsubscribeDrop();
@@ -111,23 +94,16 @@
     }
 
     inputPath = files[0];
-
     logText = `已成功選擇影片：${inputPath}`;
-    console.log("拖放的檔案路徑：", inputPath);
 
     try {
       videoDuration = await GetVideoDuration(ffmpegPath, inputPath);
-
       videoDurationText = _formatDuration(videoDuration);
-
       logText += `\n影片長度：${videoDurationText}`;
-      console.log("影片長度：", videoDuration, "秒");
     } catch (error) {
       videoDuration = 0;
       videoDurationText = "";
-
       logText += `\n取得影片長度失敗：${String(error)}`;
-      console.error("取得影片長度失敗：", error);
     }
   }
 
@@ -143,9 +119,7 @@
   async function ffmpegOutputAction(event: unknown): Promise<void> {
     const output = _getEventData<FFmpegOutput>(event);
 
-    if (!output || typeof output.line !== "string") {
-      return;
-    }
+    if (!output || typeof output.line !== "string") { return; }
 
     _appendLog(output.line);
     await _scrollLogToBottom();
@@ -214,6 +188,7 @@
       });
 
       logText += `\n----- 轉換完成 -----\n${result.message}`;
+      progress = 100.0
       await _scrollLogToBottom();
     } catch (error) {
       logText += `\n----- 轉換失敗 -----\n${String(error)}`;
@@ -259,10 +234,7 @@
    * @param ffmpegPath - FFmpeg 執行檔路徑
    * @returns 若有錯誤則回傳錯誤訊息，否則回傳 null
    */
-  function _checkInputError(
-    inputPath: string,
-    ffmpegPath: string,
-  ): string | null {
+  function _checkInputError(inputPath: string, ffmpegPath: string): string | null {
     if (!inputPath) {
       return "錯誤：請先選擇輸入影片";
     }
@@ -310,7 +282,6 @@
     }
 
     const normalized = message.replace(/\r\n/g, "\n");
-
     logText += normalized.endsWith("\n") ? normalized : `${normalized}\n`;
   }
 
@@ -344,7 +315,6 @@
    */
   function _formatDuration(totalSeconds: number): string {
     const total = Math.max(0, Math.floor(totalSeconds));
-
     const hours = Math.floor(total / 3600);
     const minutes = Math.floor((total % 3600) / 60);
     const seconds = total % 60;
@@ -362,10 +332,7 @@
    */
   async function _scrollLogToBottom(): Promise<void> {
     await tick();
-
-    if (!logElement) {
-      return;
-    }
+    if (!logElement) { return; }
 
     logElement.scrollTop = logElement.scrollHeight;
   }
@@ -383,52 +350,18 @@
         <FilePathInput value={inputPath} />
         <OutputFormatSelect bind:value={container} disabled={converting} />
         <VideoCodecSelect bind:value={videoCodec} disabled={converting} />
-        <ConvertButton
-          {converting}
-          {cancelling}
-          hasInput={Boolean(inputPath)}
-          onclick={handleConvertButton}
-        />
+        <ConvertButton {converting} {cancelling} hasInput={Boolean(inputPath)} onclick={handleConvertButton} />
       </div>
 
       <div class="options-grid">
-        <TimeOptionRow
-          label="開始"
-          ariaLabel="開始時間"
-          placeholder="00:00:00"
-          bind:enabled={enableStart}
-          bind:time={startTime}
-          {converting}
-        />
-
-        <TimeOptionRow
-          label="結束"
-          ariaLabel="結束時間"
-          placeholder="23:59:59"
-          bind:enabled={enableEnd}
-          bind:time={endTime}
-          {converting}
-        />
-
-        <SizeOptionRow
-          bind:enabled={enableSize}
-          bind:width
-          bind:height
-          {videoCodec}
-          {converting}
-        />
+        <TimeOptionRow label="開始" ariaLabel="開始時間" placeholder="00:00:00" bind:enabled={enableStart} bind:time={startTime} {converting} />
+        <TimeOptionRow label="結束" ariaLabel="結束時間" placeholder="23:59:59" bind:enabled={enableEnd} bind:time={endTime} {converting} />
+        <SizeOptionRow bind:enabled={enableSize} bind:width bind:height {videoCodec} {converting} />
       </div>
 
-      <div
-        class="progress-area"
-        class:visible={converting || progress > -1}
-        aria-live="polite"
-      >
+      <div class="progress-area" class:visible={converting || progress > -1} aria-live="polite">
         <progress value={progress} max="100" aria-label="轉換進度"></progress>
-
-        <span class="progress-value">
-          {progress.toFixed(0)}%
-        </span>
+        <span class="progress-value">{progress.toFixed(0)}%</span>
       </div>
 
       <pre class="log-panel" bind:this={logElement}>{logText}</pre>
