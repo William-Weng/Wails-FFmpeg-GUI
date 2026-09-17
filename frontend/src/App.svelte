@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
   import { Events } from "@wailsio/runtime";
-  import { EventType } from "./constants/events";
+  import { WailsEventType, FFmpegEventType } from "./constants/events";
+  import type { FFmpegProgress } from "./constants/events";
 
   import FFmpegPathInput from "./components/FfmpegPathInput.svelte";
   import FilePathInput from "./components/FilePathInput.svelte";
@@ -14,6 +15,7 @@
   import {
     StartConversion,
     CancelConversion,
+    GetVideoDuration,
   } from "../bindings/ffmpeg-gui/backend/ffmpegservice";
 
   type FFmpegOutput = {
@@ -31,14 +33,18 @@
   let converting = false;
   let cancelling = false;
 
+  let videoDuration = 0;
+  let videoDurationText = "";
   let startTime = "00:00:00";
   let endTime = "00:01:00";
   let width = 1920;
   let height = 1080;
 
+  let progress = 0;
+
   let logText = "請拖放影片檔案到上方區域";
   let logElement: HTMLElement | null = null;
-  
+
   /**
    * 元件掛載時註冊事件監聽器：
    * 1. "video-file-dropped"：處理影片檔案拖放完成
@@ -47,20 +53,31 @@
    * 回傳的清理函式會在元件卸載時取消所有訂閱
    */
   onMount(() => {
-    const unsubscribeDrop = Events.On(EventType.VideoFileDropped, (event) => {
-      videoFileDroppedAction(event);
-    });
+    const unsubscribeDrop = Events.On(
+      WailsEventType.VideoFileDropped,
+      (event) => {
+        videoFileDroppedAction(event);
+      },
+    );
 
     const unsubscribeFFmpegOutput = Events.On(
-      EventType.FFmpegOutput,
+      FFmpegEventType.Output,
       async (event) => {
         await ffmpegOutputAction(event);
+      },
+    );
+
+    const unsubscribeFFmpegProgress = Events.On(
+      FFmpegEventType.Progress,
+      (event) => {
+        ffmpegProgressAction(event)
       },
     );
 
     return () => {
       unsubscribeDrop();
       unsubscribeFFmpegOutput();
+      unsubscribeFFmpegProgress();
     };
   });
 
@@ -72,17 +89,49 @@
    *
    * @param event - 事件物件（通常來自 Events 系統）
    */
-  function videoFileDroppedAction(event: unknown): void {
+  async function videoFileDroppedAction(event: unknown): Promise<void> {
     const files = getEventData<string[]>(event);
 
-    if (Array.isArray(files) && files.length > 0) {
-      inputPath = files[0];
-      logText = `已成功選擇影片：${inputPath}`;
-      console.log("拖放的檔案路徑：", inputPath);
+    if (!Array.isArray(files) || files.length === 0) {
+      logText = "未能讀取到拖放的檔案路徑";
+      videoDuration = 0;
+      videoDurationText = "";
       return;
     }
 
-    logText = "未能讀取到拖放的檔案路徑";
+    inputPath = files[0];
+
+    logText = `已成功選擇影片：${inputPath}`;
+    console.log("拖放的檔案路徑：", inputPath);
+
+    try {
+      videoDuration = await GetVideoDuration(ffmpegPath, inputPath);
+
+      videoDurationText = formatDuration(videoDuration);
+
+      logText += `\n影片長度：${videoDurationText}`;
+      console.log("影片長度：", videoDuration, "秒");
+    } catch (error) {
+      videoDuration = 0;
+      videoDurationText = "";
+
+      logText += `\n取得影片長度失敗：${String(error)}`;
+      console.error("取得影片長度失敗：", error);
+    }
+  }
+
+  function formatDuration(totalSeconds: number): string {
+    const total = Math.max(0, Math.floor(totalSeconds));
+
+    const hours = Math.floor(total / 3600);
+    const minutes = Math.floor((total % 3600) / 60);
+    const seconds = total % 60;
+
+    return [
+      hours.toString().padStart(2, "0"),
+      minutes.toString().padStart(2, "0"),
+      seconds.toString().padStart(2, "0"),
+    ].join(":");
   }
 
   /**
@@ -100,10 +149,29 @@
       return;
     }
 
-    logText += `${output.line}\n`;
+    appendLog(output.line);
     await _scrollLogToBottom();
   }
 
+  function ffmpegProgressAction(event: unknown) {
+    const data = getEventData<FFmpegProgress>(event);
+        progress = Math.min(100, Math.max(0, data.percent));
+  }
+
+  function appendLog(message: string) {
+    if (message.endsWith("\r")) {
+      const currentLine = message.slice(0, -1);
+      const lines = logText.split("\n");
+
+      lines[lines.length - 1] = currentLine;
+      logText = lines.join("\n");
+      return;
+    }
+
+    const normalized = message.replace(/\r\n/g, "\n");
+
+    logText += normalized.endsWith("\n") ? normalized : `${normalized}\n`;
+  }
   /**
    * 從事件物件中安全取出泛型資料 T
    * - 若 event 是物件且有 data 欄位，則回傳 event.data
@@ -198,7 +266,6 @@
       const accepted = await CancelConversion();
 
       if (accepted) {
-        logText += "\n----- 正在安全停止 FFmpeg -----\n";
         await _scrollLogToBottom();
       } else {
         cancelling = false;
@@ -310,6 +377,18 @@
           {videoCodec}
           {converting}
         />
+      </div>
+
+      <div
+        class="progress-area"
+        class:visible={converting || progress > 0}
+        aria-live="polite"
+      >
+        <progress value={progress} max="100" aria-label="轉換進度"></progress>
+
+        <span class="progress-value">
+          {progress.toFixed(0)}%
+        </span>
       </div>
 
       <pre class="log-panel" bind:this={logElement}>{logText}</pre>

@@ -8,10 +8,19 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
+)
+
+var totalDuration = 0.0
+var lastPercent = -1.0
+
+var ffmpegTimePattern = regexp.MustCompile(
+	`(?:^|\s)time=\s*([0-9:.]+)`,
 )
 
 // MARK: - Lifecycle Hooks
@@ -46,6 +55,134 @@ func NewFFmpegService() *FFmpegService {
 	return &FFmpegService{}
 }
 
+// GetVideoDuration 使用 ffprobe 取得影片長度，單位為秒。
+//
+// 回傳：
+// - duration：影片長度，例如 180.52 秒
+// - error：ffprobe 執行失敗或輸出格式無法解析
+func (service *FFmpegService) GetVideoDuration(
+	ffmpegPath string,
+	inputPath string,
+) (float64, error) {
+	inputPath = strings.TrimSpace(inputPath)
+	ffmpegPath = strings.TrimSpace(ffmpegPath)
+
+	if inputPath == "" {
+		return 0, errors.New("請先選擇輸入影片")
+	}
+
+	if err := checkInputFile(inputPath); err != nil {
+		return 0, err
+	}
+
+	ffprobePath := deriveFFprobePath(ffmpegPath)
+
+	command := exec.CommandContext(
+		service.commandContext(),
+		ffprobePath,
+		"-v", "error",
+		"-show_entries", "format=duration",
+		"-of", "default=noprint_wrappers=1:nokey=1",
+		inputPath,
+	)
+
+	output, err := command.Output()
+	if err != nil {
+		return 0, fmt.Errorf("ffprobe 執行失敗：%w", err)
+	}
+
+	duration, err := strconv.ParseFloat(
+		strings.TrimSpace(string(output)),
+		64,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("無法解析影片長度：%w", err)
+	}
+
+	if duration <= 0 {
+		return 0, errors.New("影片長度必須大於 0")
+	}
+
+	return duration, nil
+}
+
+func parseFFmpegTimeFromOutput(line string) (float64, bool) {
+	matches := ffmpegTimePattern.FindStringSubmatch(line)
+	if len(matches) != 2 {
+		return 0, false
+	}
+
+	seconds, err := parseFFmpegTimestamp(matches[1])
+	if err != nil {
+		return 0, false
+	}
+
+	return seconds, true
+}
+
+func parseFFmpegTimestamp(value string) (float64, error) {
+	parts := strings.Split(value, ":")
+	if len(parts) != 3 {
+		return 0, fmt.Errorf("無效的 FFmpeg 時間：%q", value)
+	}
+
+	hours, err := strconv.ParseFloat(parts[0], 64)
+	if err != nil {
+		return 0, fmt.Errorf("解析小時失敗：%w", err)
+	}
+
+	minutes, err := strconv.ParseFloat(parts[1], 64)
+	if err != nil {
+		return 0, fmt.Errorf("解析分鐘失敗：%w", err)
+	}
+
+	seconds, err := strconv.ParseFloat(parts[2], 64)
+	if err != nil {
+		return 0, fmt.Errorf("解析秒數失敗：%w", err)
+	}
+
+	return hours*3600 + minutes*60 + seconds, nil
+}
+
+func parseFFmpegProgressTime(line string) (float64, bool) {
+
+	matches := ffmpegTimePattern.FindStringSubmatch(line)
+	if len(matches) != 2 {
+		return 0, false
+	}
+
+	seconds, err := parseFFmpegTime(matches[1])
+	if err != nil {
+		return 0, false
+	}
+
+	return seconds, true
+}
+
+func parseFFmpegTime(value string) (float64, error) {
+	parts := strings.Split(value, ":")
+	if len(parts) != 3 {
+		return 0, fmt.Errorf("無效的 FFmpeg time: %q", value)
+	}
+
+	hours, err := strconv.ParseFloat(parts[0], 64)
+	if err != nil {
+		return 0, err
+	}
+
+	minutes, err := strconv.ParseFloat(parts[1], 64)
+	if err != nil {
+		return 0, err
+	}
+
+	seconds, err := strconv.ParseFloat(parts[2], 64)
+	if err != nil {
+		return 0, err
+	}
+
+	return hours*3600 + minutes*60 + seconds, nil
+}
+
 // StartConversion 啟動一次 FFmpeg 影片轉換工作
 //   - 函式會先驗證輸入檔案，接著建立輸出路徑與 FFmpeg 參數，然後啟動 FFmpeg 並即時讀取其 stderr 輸出
 //   - 不使用 -nostdin，才能在取消時對 FFmpeg 寫入 `q`
@@ -57,9 +194,22 @@ func NewFFmpegService() *FFmpegService {
 //   - 轉換失敗時，回傳空的 ConversionResult 與錯誤訊息
 func (service *FFmpegService) StartConversion(options ConversionOptions) (ConversionResult, error) {
 
+	totalDuration = 0
+
 	if err := checkFileExists(options); err != nil {
 		return ConversionResult{}, err
 	}
+
+	duration, err := service.GetVideoDuration(
+		options.FFmpegPath,
+		options.InputPath,
+	)
+
+	if err != nil {
+		return ConversionResult{}, err
+	}
+
+	totalDuration = duration
 
 	if err := service.beginConversion(); err != nil {
 		return ConversionResult{}, err
@@ -126,7 +276,7 @@ func (service *FFmpegService) CancelConversion() bool {
 		return false
 	}
 
-	service.emitOutput("----- 正在安全停止 FFmpeg -----")
+	service.emitOutput("\n\n----- 正在安全停止 FFmpeg -----")
 	go service.forceKillIfNeeded(cmd, 5*time.Second)
 
 	return true
@@ -199,44 +349,166 @@ func (service *FFmpegService) emitOutput(line string) {
 		return
 	}
 
-	service.App.Event.Emit("ffmpeg:output", FFmpegOutput{Line: line})
+	service.App.Event.Emit(FFmpegEventOutput.String(), FFmpegOutput{Line: line})
+}
+
+func (service *FFmpegService) emitProgress(progress FFmpegProgress) {
+
+	if service.App == nil {
+		fmt.Printf(
+			"FFmpeg progress: %.1f%% (%.2f / %.2f sec)\n",
+			progress.Percent,
+			progress.CurrentSeconds,
+			progress.TotalSeconds,
+		)
+		return
+	}
+
+	service.App.Event.Emit(
+		string(FFmpegEventProgress),
+		progress,
+	)
+}
+
+func (service *FFmpegService) emitCompleted(outputPath string) {
+	if service.App == nil {
+		fmt.Printf("FFmpeg completed: %s\n", outputPath)
+		return
+	}
+
+	service.App.Event.Emit(
+		string(FFmpegEventCompleted),
+		FFmpegCompleted{
+			OutputPath: outputPath,
+		},
+	)
+}
+
+func (service *FFmpegService) emitFailed(err error) {
+	if service.App == nil {
+		fmt.Printf("FFmpeg failed: %v\n", err)
+		return
+	}
+
+	service.App.Event.Emit(
+		string(FFmpegEventFailed),
+		FFmpegFailed{
+			Message: err.Error(),
+		},
+	)
 }
 
 // 從 reader 逐字元讀取 FFmpeg 的輸出內容，每次只從 reader 讀取一個字元
 //   - 當讀到換行字元（\n）或回車字元（\r）時，就將目前累積的內容傳送給前端
 //   - 如果輸入串流結束時仍有尚未傳送的內容，函式會在收到 io.EOF 時一併送出最後一行
-func (service *FFmpegService) streamFFmpegOutput(reader io.Reader) {
-
+func (service *FFmpegService) streamFFmpegOutput(
+	reader io.Reader,
+	totalDuration float64,
+) {
 	buffer := make([]byte, 1)
 	var line strings.Builder
 
-	emit := func() {
+	lastPercent := -1.0
 
+	emit := func(suffix byte) {
 		if line.Len() == 0 {
 			return
 		}
 
-		service.emitOutput(line.String())
+		output := line.String()
+
+		service.emitOutput(output + string(suffix))
+
+		lastPercent = service.updateProgress(
+			output,
+			suffix,
+			totalDuration,
+			lastPercent,
+		)
+
+		fmt.Printf("lastPercent = %.2f\n", lastPercent)
 		line.Reset()
 	}
 
 	for {
-		_, err := reader.Read(buffer)
+		count, err := reader.Read(buffer)
+
+		if count > 0 {
+			switch buffer[0] {
+			case '\r':
+				emit('\r')
+
+			case '\n':
+				emit('\n')
+
+			default:
+				line.WriteByte(buffer[0])
+			}
+		}
 
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				emit()
+				emit(0)
 			}
+
 			return
 		}
-
-		switch buffer[0] {
-		case '\r', '\n':
-			emit()
-		default:
-			line.WriteByte(buffer[0])
-		}
 	}
+}
+
+func calculateProgress(
+	currentSeconds float64,
+	totalDuration float64,
+) float64 {
+	if totalDuration <= 0 {
+		return 0
+	}
+
+	percent := currentSeconds / totalDuration * 100
+
+	if percent < 0 {
+		return 0
+	}
+
+	if percent > 100 {
+		return 100
+	}
+
+	return percent
+}
+
+func (service *FFmpegService) updateProgress(
+	output string,
+	suffix byte,
+	totalDuration float64,
+	lastPercent float64,
+) float64 {
+	if suffix != '\r' {
+		return lastPercent
+	}
+
+	currentSeconds, found := parseFFmpegTimeFromOutput(output)
+	if !found {
+		return lastPercent
+	}
+
+	percent := calculateProgress(
+		currentSeconds,
+		totalDuration,
+	)
+
+	// 避免同一百分比或差異極小的進度反覆觸發前端重繪。
+	if percent-lastPercent < 0.1 {
+		return lastPercent
+	}
+
+	service.emitProgress(FFmpegProgress{
+		CurrentSeconds: currentSeconds,
+		TotalSeconds:   totalDuration,
+		Percent:        percent,
+	})
+
+	return percent
 }
 
 // 根據影片轉換選項和輸出檔案路徑，建立 FFmpeg 命令列所需的參數列表；此函式只負責組合參數，不會實際執行 FFmpeg
@@ -309,11 +581,16 @@ func checkFileExists(options ConversionOptions) error {
 		return errors.New("請先選擇輸入影片")
 	}
 
-	info, err := os.Stat(options.InputPath)
+	return checkInputFile(options.InputPath)
+}
+
+func checkInputFile(inputPath string) error {
+	info, err := os.Stat(inputPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return fmt.Errorf("輸入檔案不存在：%w", err)
 		}
+
 		return fmt.Errorf("無法讀取輸入檔案：%w", err)
 	}
 
@@ -322,6 +599,27 @@ func checkFileExists(options ConversionOptions) error {
 	}
 
 	return nil
+}
+
+func deriveFFprobePath(ffmpegPath string) string {
+	if ffmpegPath == "" {
+		return "ffprobe"
+	}
+
+	ffmpegPath = filepath.Clean(ffmpegPath)
+	dir := filepath.Dir(ffmpegPath)
+	base := filepath.Base(ffmpegPath)
+
+	switch base {
+	case "ffmpeg":
+		return filepath.Join(dir, "ffprobe")
+
+	case "ffmpeg.exe":
+		return filepath.Join(dir, "ffprobe.exe")
+
+	default:
+		return "ffprobe"
+	}
 }
 
 // beginConversion 檢查目前是否已有 FFmpeg 轉換正在執行，並在沒有其他轉換時初始化新的轉換狀態
@@ -412,7 +710,7 @@ func (service *FFmpegService) executeFFmpeg(command *exec.Cmd, stderr io.ReadClo
 
 	go func() {
 		defer close(outputDone)
-		service.streamFFmpegOutput(stderr)
+		service.streamFFmpegOutput(stderr, totalDuration)
 	}()
 
 	err := command.Wait()
