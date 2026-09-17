@@ -46,11 +46,22 @@
   let logElement: HTMLElement | null = null;
 
   /**
-   * 元件掛載時註冊事件監聽器：
-   * 1. "video-file-dropped"：處理影片檔案拖放完成
-   * 2. "ffmpeg:output"：處理 FFmpeg 即時輸出行
+   * 元件掛載時註冊 Wails 事件監聽器：
    *
-   * 回傳的清理函式會在元件卸載時取消所有訂閱
+   * 1. "video-file-dropped"
+   *    - 處理使用者拖放影片檔案後的資料。
+   *
+   * 2. "ffmpeg:output"
+   *    - 接收 FFmpeg stderr 的即時文字輸出。
+   *    - 一般以 `\n` 結束的訊息會追加為新 log 行；
+   *      以 `\r` 結束的進度列則覆寫目前最後一行。
+   *
+   * 3. "ffmpeg:progress"
+   *    - 接收後端依 FFmpeg `time=` 與影片總長度計算的結構化進度資料。
+   *    - 用於更新 progress element 與百分比文字。
+   *
+   * onMount 回傳的 cleanup function 會在元件卸載時執行，
+   * 取消所有事件訂閱，避免重新掛載元件後產生重複 listener。
    */
   onMount(() => {
     const unsubscribeDrop = Events.On(
@@ -70,7 +81,7 @@
     const unsubscribeFFmpegProgress = Events.On(
       FFmpegEventType.Progress,
       (event) => {
-        ffmpegProgressAction(event)
+        ffmpegProgressAction(event);
       },
     );
 
@@ -90,7 +101,7 @@
    * @param event - 事件物件（通常來自 Events 系統）
    */
   async function videoFileDroppedAction(event: unknown): Promise<void> {
-    const files = getEventData<string[]>(event);
+    const files = _getEventData<string[]>(event);
 
     if (!Array.isArray(files) || files.length === 0) {
       logText = "未能讀取到拖放的檔案路徑";
@@ -107,7 +118,7 @@
     try {
       videoDuration = await GetVideoDuration(ffmpegPath, inputPath);
 
-      videoDurationText = formatDuration(videoDuration);
+      videoDurationText = _formatDuration(videoDuration);
 
       logText += `\n影片長度：${videoDurationText}`;
       console.log("影片長度：", videoDuration, "秒");
@@ -120,22 +131,9 @@
     }
   }
 
-  function formatDuration(totalSeconds: number): string {
-    const total = Math.max(0, Math.floor(totalSeconds));
-
-    const hours = Math.floor(total / 3600);
-    const minutes = Math.floor((total % 3600) / 60);
-    const seconds = total % 60;
-
-    return [
-      hours.toString().padStart(2, "0"),
-      minutes.toString().padStart(2, "0"),
-      seconds.toString().padStart(2, "0"),
-    ].join(":");
-  }
-
   /**
    * 處理 FFmpeg 即時輸出行的事件回調
+   *
    * - 從事件中解出 FFmpegOutput 物件
    * - 若 output 存在且 output.line 為字串，則追加到日誌並捲動到底部
    * - 否則忽略該事件
@@ -143,50 +141,28 @@
    * @param event - 來自 Events 系統的事件物件，負載為 FFmpegOutput
    */
   async function ffmpegOutputAction(event: unknown): Promise<void> {
-    const output = getEventData<FFmpegOutput>(event);
+    const output = _getEventData<FFmpegOutput>(event);
 
     if (!output || typeof output.line !== "string") {
       return;
     }
 
-    appendLog(output.line);
+    _appendLog(output.line);
     await _scrollLogToBottom();
   }
 
-  function ffmpegProgressAction(event: unknown) {
-    const data = getEventData<FFmpegProgress>(event);
-        progress = Math.min(100, Math.max(0, data.percent));
-  }
-
-  function appendLog(message: string) {
-    if (message.endsWith("\r")) {
-      const currentLine = message.slice(0, -1);
-      const lines = logText.split("\n");
-
-      lines[lines.length - 1] = currentLine;
-      logText = lines.join("\n");
-      return;
-    }
-
-    const normalized = message.replace(/\r\n/g, "\n");
-
-    logText += normalized.endsWith("\n") ? normalized : `${normalized}\n`;
-  }
   /**
-   * 從事件物件中安全取出泛型資料 T
-   * - 若 event 是物件且有 data 欄位，則回傳 event.data
-   * - 否則直接把 event 當作 T 回傳
+   * 處理後端 FFmpeg 發送的轉換進度事件
    *
-   * @template T - 期望取得的資料型別
-   * @param event - 事件物件或任意值
-   * @returns 解包後的資料，型別為 T
+   * 後端會透過 `ffmpeg:progress` 事件傳送 FFmpegProgress：
+   * - currentSeconds：目前已處理的影片秒數
+   * - totalSeconds：影片總長度（秒）
+   * - percent：目前轉換百分比
+   * - 這裡只使用 percent 更新 UI 的進度條，並將數值限制為 0～100，避免因 FFmpeg 最後 timestamp、浮點數誤差或異常資料，造成 progress element 收到負數或超過 100 的數值
    */
-  function getEventData<T>(event: unknown): T {
-    if (event !== null && typeof event === "object" && "data" in event) {
-      return (event as { data: T }).data;
-    }
-
-    return event as T;
+  function ffmpegProgressAction(event: unknown) {
+    const data = _getEventData<FFmpegProgress>(event);
+    progress = Math.min(100, Math.max(0, data.percent));
   }
 
   /**
@@ -317,6 +293,70 @@
   }
 
   /**
+   * 將一筆 FFmpeg 輸出追加到前端 log
+   *
+   * - FFmpeg 的即時進度列通常以 `\r` 結尾，而非 `\n`
+   * - `\r` 在終端機中代表游標回到目前行首，因此下一筆狀態會覆寫同一行；這裡模擬相同行為，將 logText 的最後一行替換為最新進度資訊，避免每次 progress 更新都新增一行文字
+   * - 一般以 `\n` 結尾的 FFmpeg metadata、warning、error 或一般訊息，則視為獨立 log 行，直接追加到 logText
+   */
+  function _appendLog(message: string) {
+    if (message.endsWith("\r")) {
+      const currentLine = message.slice(0, -1);
+      const lines = logText.split("\n");
+
+      lines[lines.length - 1] = currentLine;
+      logText = lines.join("\n");
+      return;
+    }
+
+    const normalized = message.replace(/\r\n/g, "\n");
+
+    logText += normalized.endsWith("\n") ? normalized : `${normalized}\n`;
+  }
+
+  /**
+   * 從事件物件中安全取出泛型資料 T
+   * - 若 event 是物件且有 data 欄位，則回傳 event.data
+   * - 否則直接把 event 當作 T 回傳
+   *
+   * @template T - 期望取得的資料型別
+   * @param event - 事件物件或任意值
+   * @returns 解包後的資料，型別為 T
+   */
+  function _getEventData<T>(event: unknown): T {
+    if (event !== null && typeof event === "object" && "data" in event) {
+      return (event as { data: T }).data;
+    }
+
+    return event as T;
+  }
+
+  /**
+   * 將秒數格式化為固定的 HH:MM:SS 時間字串。
+   *
+   * 小數秒會向下取整；負數會先限制為 0。
+   *
+   * 範例：
+   * - 0 → "00:00:00"
+   * - 51.54 → "00:00:51"
+   * - 764 → "00:12:44"
+   * - 3_661 → "01:01:01"
+   */
+  function _formatDuration(totalSeconds: number): string {
+    const total = Math.max(0, Math.floor(totalSeconds));
+
+    const hours = Math.floor(total / 3600);
+    const minutes = Math.floor((total % 3600) / 60);
+    const seconds = total % 60;
+
+    return [
+      hours.toString().padStart(2, "0"),
+      minutes.toString().padStart(2, "0"),
+      seconds.toString().padStart(2, "0"),
+    ].join(":");
+  }
+
+  /**
    * 將日誌區域捲動到最底部
    *  - 先等待 DOM 更新（tick），再設定 scrollTop
    */
@@ -381,7 +421,7 @@
 
       <div
         class="progress-area"
-        class:visible={converting || progress > 0}
+        class:visible={converting || progress > -1}
         aria-live="polite"
       >
         <progress value={progress} max="100" aria-label="轉換進度"></progress>

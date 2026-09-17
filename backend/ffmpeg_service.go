@@ -426,7 +426,6 @@ func (service *FFmpegService) streamFFmpegOutput(
 			lastPercent,
 		)
 
-		fmt.Printf("lastPercent = %.2f\n", lastPercent)
 		line.Reset()
 	}
 
