@@ -13,18 +13,21 @@ type FFmpegOutput struct {
 	Line string `json:"line"` // Line 儲存 FFmpeg 輸出的內容；`json:"line"` 表示轉換成 JSON 時，欄位名稱會是 "line"
 }
 
+// FFmpegProgress 表示 FFmpeg 影片轉換的即時進度
 type FFmpegProgress struct {
-	CurrentSeconds float64 `json:"currentSeconds"`
-	TotalSeconds   float64 `json:"totalSeconds"`
-	Percent        float64 `json:"percent"`
+	CurrentSeconds float64 `json:"currentSeconds"` // CurrentSeconds 是 FFmpeg 目前已處理到的輸出時間，單位為秒
+	TotalSeconds   float64 `json:"totalSeconds"`   // TotalSeconds 是來源影片或預期輸出的總長度，單位為秒
+	Percent        float64 `json:"percent"`        // Percent 是目前轉換進度百分比，正常範圍為 0 到 100
 }
 
+// FFmpegCompleted 表示 FFmpeg 已成功完成影片轉換
 type FFmpegCompleted struct {
-	OutputPath string `json:"outputPath"`
+	OutputPath string `json:"outputPath"` // OutputPath 是成功建立的輸出影片完整路徑
 }
 
+// FFmpegFailed 表示 FFmpeg 無法啟動或影片轉換過程失敗
 type FFmpegFailed struct {
-	Message string `json:"message"`
+	Message string `json:"message"` // Message 是可供前端顯示或寫入 log 的錯誤訊息
 }
 
 // ConversionOptions 定義影片轉換時所需的設定

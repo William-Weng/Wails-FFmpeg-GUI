@@ -1,5 +1,5 @@
 /**
- * Wails 應用程式層級事件名稱。
+ * Wails 應用程式層級事件名稱
  *
  * - 用於不屬於特定功能模組的事件，例如視窗拖放檔案
  */
@@ -8,7 +8,7 @@ export enum WailsEventType {
 }
 
 /**
- * FFmpeg 影片處理事件名稱。
+ * FFmpeg 影片處理事件名稱
  *
  * - 所有 FFmpeg 相關事件皆使用 `ffmpeg:` 作為 namespace，讓前端訂閱、除錯與事件搜尋時可與其他 Wails 事件區分
  */
