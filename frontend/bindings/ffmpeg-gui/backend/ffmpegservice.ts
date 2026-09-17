@@ -42,18 +42,18 @@ export function GetConversionState(): $CancellablePromise<$models.ConversionStat
 }
 
 /**
- * GetVideoDuration 使用 ffprobe 取得影片長度，單位為秒。
+ * 	使用 ffprobe 取得影片長度，單位為秒
  * 
  * 回傳：
- * - duration：影片長度，例如 180.52 秒
- * - error：ffprobe 執行失敗或輸出格式無法解析
+ *   - duration：影片長度，例如 180.52 秒
+ *   - error：ffprobe 執行失敗或輸出格式無法解析
  */
 export function GetVideoDuration(ffmpegPath: string, inputPath: string): $CancellablePromise<number> {
     return $Call.ByID(884924980, ffmpegPath, inputPath);
 }
 
 /**
- * StartConversion 啟動一次 FFmpeg 影片轉換工作
+ * 啟動一次 FFmpeg 影片轉換工作
  *   - 函式會先驗證輸入檔案，接著建立輸出路徑與 FFmpeg 參數，然後啟動 FFmpeg 並即時讀取其 stderr 輸出
  *   - 不使用 -nostdin，才能在取消時對 FFmpeg 寫入 `q`
  *   - 如果轉換期間收到取消要求，函式會等待 FFmpeg 嘗試正常結束
