@@ -1,4 +1,4 @@
-package backend
+package utility
 
 import (
 	"errors"
@@ -9,19 +9,19 @@ import (
 )
 
 // 驗證轉換選項是否已指定輸入影片，並確認輸入路徑存在、可存取且不是資料夾
-func checkFileExists(options ConversionOptions) error {
+func CheckFileExists(options ConversionOptions) error {
 
 	if strings.TrimSpace(options.InputPath) == "" {
 		return errors.New("請先選擇輸入影片")
 	}
 
-	return checkInputFile(options.InputPath)
+	return CheckInputFile(options.InputPath)
 }
 
 // 驗證指定路徑是否為存在且可存取的一般檔案
 //
 //   - 此函式只確認檔案存在且不是資料夾；不驗證副檔名、MIME type 或 FFmpeg 是否實際支援該媒體格式
-func checkInputFile(inputPath string) error {
+func CheckInputFile(inputPath string) error {
 
 	info, err := os.Stat(inputPath)
 
@@ -47,7 +47,7 @@ func checkInputFile(inputPath string) error {
 // 範例：
 //   - "/opt/homebrew/bin/ffmpeg" → "/opt/homebrew/bin/ffprobe"
 //   - "C:\\tools\\ffmpeg.exe" → "C:\\tools\\ffprobe.exe"
-func deriveFFprobePath(ffmpegPath string) string {
+func DeriveFFprobePath(ffmpegPath string) string {
 
 	ffmpegPath = strings.TrimSpace(ffmpegPath)
 

@@ -1,4 +1,4 @@
-package backend
+package utility
 
 import (
 	"fmt"
@@ -16,7 +16,7 @@ import (
 //
 // 回傳值:
 //   - 依序為 stdin、stderr 和錯誤
-func createFFmpegPipes(command *exec.Cmd) (io.WriteCloser, io.ReadCloser, error) {
+func CreateFFmpegPipes(command *exec.Cmd) (io.WriteCloser, io.ReadCloser, error) {
 
 	stdin, err := command.StdinPipe()
 	if err != nil {
@@ -42,14 +42,14 @@ func createFFmpegPipes(command *exec.Cmd) (io.WriteCloser, io.ReadCloser, error)
 //
 // 回傳：
 //   - 可傳給 exec.Command 或 exec.CommandContext 的 FFmpeg 參數列表
-func buildFFmpegArguments(options ConversionOptions, outputPath string) ([]string, error) {
+func BuildFFmpegArguments(options ConversionOptions, outputPath string) ([]string, error) {
 
 	args := []string{"-y"}
 
 	startSeconds := 0.0
 
 	if options.UseStart && options.StartTime != "" {
-		seconds, err := parseTimestamp(options.StartTime)
+		seconds, err := ParseTimestamp(options.StartTime)
 		if err != nil {
 			return nil, fmt.Errorf("無效開始時間：%w", err)
 		}
@@ -59,7 +59,7 @@ func buildFFmpegArguments(options ConversionOptions, outputPath string) ([]strin
 	}
 
 	if options.UseEnd && options.EndTime != "" {
-		endSeconds, err := parseTimestamp(options.EndTime)
+		endSeconds, err := ParseTimestamp(options.EndTime)
 		if err != nil {
 			return nil, fmt.Errorf("無效結束時間：%w", err)
 		}
@@ -73,7 +73,7 @@ func buildFFmpegArguments(options ConversionOptions, outputPath string) ([]strin
 			)
 		}
 
-		args = append(args, "-t", formatTimestamp(durationSeconds))
+		args = append(args, "-t", FormatTimestamp(durationSeconds))
 	}
 
 	args = append(args, "-i", options.InputPath)
@@ -126,7 +126,7 @@ func buildFFmpegArguments(options ConversionOptions, outputPath string) ([]strin
 //	container: "mp4"
 //
 //	輸出："/Users/me/Videos/movie_20260915-102700.123.mp4"
-func makeOutputPath(inputPath string, container string) string {
+func MakeOutputPath(inputPath string, container string) string {
 
 	extension := filepath.Ext(inputPath)
 	base := strings.TrimSuffix(inputPath, extension)
@@ -136,7 +136,7 @@ func makeOutputPath(inputPath string, container string) string {
 }
 
 // 去除前後空白，並將英文字母轉成小寫；例如： ".MP4"  -> "mp4"
-func normalizeContainer(value string) string {
+func NormalizeContainer(value string) string {
 
 	value = strings.TrimSpace(strings.ToLower(value))
 	value = strings.TrimPrefix(value, ".")

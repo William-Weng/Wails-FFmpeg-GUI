@@ -3,10 +3,13 @@ package backend
 import (
 	"context"
 	"errors"
+	"ffmpeg-gui/backend/utility"
+	util "ffmpeg-gui/backend/utility"
+	"sync"
+
 	"fmt"
 	"io"
 	"os/exec"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -14,12 +17,19 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
+// FFmpegService 封裝 FFmpeg 轉換流程與狀態管理
+type FFmpegService struct {
+	App        *application.App // App 是 Wails 應用程式的實例；可用來和 Wails 的事件系統或應用程式生命週期互動
+	mutex      sync.Mutex       // mutex 用來保護下方的共享狀態；由於 FFmpeg 可能在背景 goroutine 中執行，因此需要使用 Mutex 避免多個 goroutine 同時讀寫造成資料競爭
+	running    bool             // running 表示目前是否有 FFmpeg 轉換工作正在執行
+	cancelling bool             // cancelling 表示目前是否正在處理取消操作；例如：已收到取消要求，但 FFmpeg 程序尚未完全結束
+	cancelled  bool             // cancelled 表示目前的轉換是否已被取消
+	stdin      io.WriteCloser   // stdin 是 FFmpeg 程序的標準輸入；可透過寫入 "q" 要求 FFmpeg 優雅地結束
+	cmd        *exec.Cmd        // cmd 儲存目前正在執行的 FFmpeg 外部程序；可透過它取得程序狀態，或呼叫 Process.Kill() 強制終止程序
+}
+
 var totalDuration = 0.0
 var lastPercent = -1.0
-
-var ffmpegTimePattern = regexp.MustCompile(
-	`(?:^|\s)time=\s*([0-9:.]+)`,
-)
 
 // MARK: - Lifecycle Hooks
 // ServiceStartup 是 Wails v3 的服務啟動生命週期勾子
@@ -67,11 +77,11 @@ func (service *FFmpegService) GetVideoDuration(ffmpegPath string, inputPath stri
 		return 0, errors.New("請先選擇輸入影片")
 	}
 
-	if err := checkInputFile(inputPath); err != nil {
+	if err := util.CheckInputFile(inputPath); err != nil {
 		return 0, err
 	}
 
-	ffprobePath := deriveFFprobePath(ffmpegPath)
+	ffprobePath := util.DeriveFFprobePath(ffmpegPath)
 
 	command := exec.CommandContext(
 		service.commandContext(),
@@ -111,20 +121,20 @@ func (service *FFmpegService) GetVideoDuration(ffmpegPath string, inputPath stri
 // 回傳：
 //   - 轉換成功時，回傳 ConversionResult 與 nil 錯誤
 //   - 轉換失敗時，回傳空的 ConversionResult 與錯誤訊息
-func (service *FFmpegService) StartConversion(options ConversionOptions) (ConversionResult, error) {
+func (service *FFmpegService) StartConversion(options utility.ConversionOptions) (utility.ConversionResult, error) {
 
-	if err := checkFileExists(options); err != nil {
-		return ConversionResult{}, err
+	if err := util.CheckFileExists(options); err != nil {
+		return utility.ConversionResult{}, err
 	}
 
 	totalDuration, err := service.parseTotalDuration(options)
 
 	if err != nil {
-		return ConversionResult{}, fmt.Errorf("取得影片長度失敗：%w", err)
+		return utility.ConversionResult{}, fmt.Errorf("取得影片長度失敗：%w", err)
 	}
 
 	if err := service.beginConversion(); err != nil {
-		return ConversionResult{}, err
+		return utility.ConversionResult{}, err
 	}
 
 	defer service.clearRunningState()
@@ -132,12 +142,12 @@ func (service *FFmpegService) StartConversion(options ConversionOptions) (Conver
 	command, outputPath, err := service.buildFFmpegCommand(options)
 
 	if err != nil {
-		return ConversionResult{}, err
+		return utility.ConversionResult{}, err
 	}
 
-	stdin, stderr, err := createFFmpegPipes(command)
+	stdin, stderr, err := util.CreateFFmpegPipes(command)
 	if err != nil {
-		return ConversionResult{}, err
+		return utility.ConversionResult{}, err
 	}
 
 	service.mutex.Lock()
@@ -145,11 +155,7 @@ func (service *FFmpegService) StartConversion(options ConversionOptions) (Conver
 	service.cmd = command
 	service.mutex.Unlock()
 
-	err = service.executeFFmpeg(
-		command,
-		stderr,
-		totalDuration,
-	)
+	err = service.executeFFmpeg(command, stderr, totalDuration)
 
 	service.mutex.Lock()
 	wasCancelled := service.cancelled
@@ -205,12 +211,12 @@ func (service *FFmpegService) CancelConversion() bool {
 
 // 取得目前 FFmpeg 轉換的狀態
 //   - 函式會使用互斥鎖保護共享狀態，避免在其他 goroutine 修改狀態時讀取到不一致的資料
-func (service *FFmpegService) GetConversionState() ConversionState {
+func (service *FFmpegService) GetConversionState() utility.ConversionState {
 
 	service.mutex.Lock()
 	defer service.mutex.Unlock()
 
-	return ConversionState{
+	return utility.ConversionState{
 		Running:    service.running,
 		Cancelling: service.cancelling,
 		Cancelled:  service.cancelled,
@@ -270,21 +276,21 @@ func (service *FFmpegService) emitOutput(line string) {
 		return
 	}
 
-	service.App.Event.Emit(FFmpegEventOutput.String(), FFmpegOutput{Line: line})
+	service.App.Event.Emit(util.FFmpegEventOutput.String(), utility.FFmpegOutput{Line: line})
 }
 
 // 發送 FFmpeg 目前的轉換進度
 //   - 沒有 Wails App 時，進度會輸出至終端機，方便測試或以獨立模式執行
 //   - 有 Wails App 時，會透過 ffmpeg:progress 事件將 FFmpegProgress
 //   - 資料傳送給前端，用於更新進度條、處理時間與百分比
-func (service *FFmpegService) emitProgress(progress FFmpegProgress) {
+func (service *FFmpegService) emitProgress(progress utility.FFmpegProgress) {
 
 	if service.App == nil {
 		fmt.Printf("FFmpeg progress: %.1f%% (%.2f / %.2f sec)\n", progress.Percent, progress.CurrentSeconds, progress.TotalSeconds)
 		return
 	}
 
-	service.App.Event.Emit(FFmpegEventProgress.String(), progress)
+	service.App.Event.Emit(util.FFmpegEventProgress.String(), progress)
 }
 
 // 發送 FFmpeg 成功完成轉換的事件
@@ -298,7 +304,7 @@ func (service *FFmpegService) emitCompleted(outputPath string) {
 		return
 	}
 
-	service.App.Event.Emit(FFmpegEventCompleted.String(), FFmpegCompleted{OutputPath: outputPath})
+	service.App.Event.Emit(util.FFmpegEventCompleted.String(), utility.FFmpegCompleted{OutputPath: outputPath})
 }
 
 // 發送 FFmpeg 轉換失敗的事件
@@ -316,7 +322,7 @@ func (service *FFmpegService) emitFailed(err error) {
 		return
 	}
 
-	service.App.Event.Emit(FFmpegEventFailed.String(), FFmpegFailed{Message: err.Error()})
+	service.App.Event.Emit(util.FFmpegEventFailed.String(), utility.FFmpegFailed{Message: err.Error()})
 }
 
 // 從 reader 逐字元讀取 FFmpeg 的輸出內容，每次只從 reader 讀取一個字元
@@ -410,12 +416,12 @@ func (service *FFmpegService) commandContext() context.Context {
 //   - error：建立參數或命令時發生的錯誤
 //
 // 此方法只建立命令，不會執行 FFmpeg；呼叫端需使用 command.Start()、command.Run()、command.Wait() 或 command.Output() 啟動或等待外部程序。
-func (service *FFmpegService) buildFFmpegCommand(options ConversionOptions) (*exec.Cmd, string, error) {
+func (service *FFmpegService) buildFFmpegCommand(options utility.ConversionOptions) (*exec.Cmd, string, error) {
 
-	container := normalizeContainer(options.Container)
-	outputPath := makeOutputPath(options.InputPath, container)
+	container := util.NormalizeContainer(options.Container)
+	outputPath := util.MakeOutputPath(options.InputPath, container)
+	args, err := util.BuildFFmpegArguments(options, outputPath)
 
-	args, err := buildFFmpegArguments(options, outputPath)
 	if err != nil {
 		return nil, "", err
 	}
@@ -462,7 +468,7 @@ func (service *FFmpegService) executeFFmpeg(command *exec.Cmd, stderr io.ReadClo
 //   - 使用者有設定開始時間：輸出從該時間開始
 //   - 使用者有設定結束時間：輸出在來源時間軸的該位置停止
 //   - 避免使用者輸入超出影片長度的 end time
-func (service *FFmpegService) parseTotalDuration(options ConversionOptions) (float64, error) {
+func (service *FFmpegService) parseTotalDuration(options utility.ConversionOptions) (float64, error) {
 
 	sourceDuration, err := service.GetVideoDuration(options.FFmpegPath, options.InputPath)
 
@@ -475,7 +481,7 @@ func (service *FFmpegService) parseTotalDuration(options ConversionOptions) (flo
 
 	if options.UseStart && strings.TrimSpace(options.StartTime) != "" {
 
-		startSeconds, err = parseTimestamp(options.StartTime)
+		startSeconds, err = util.ParseTimestamp(options.StartTime)
 
 		if err != nil {
 			return 0, fmt.Errorf("解析開始時間失敗：%w", err)
@@ -483,7 +489,7 @@ func (service *FFmpegService) parseTotalDuration(options ConversionOptions) (flo
 	}
 
 	if options.UseEnd && strings.TrimSpace(options.EndTime) != "" {
-		endSeconds, err = parseTimestamp(options.EndTime)
+		endSeconds, err = util.ParseTimestamp(options.EndTime)
 		if err != nil {
 			return 0, fmt.Errorf("解析結束時間失敗：%w", err)
 		}
@@ -494,7 +500,7 @@ func (service *FFmpegService) parseTotalDuration(options ConversionOptions) (flo
 	}
 
 	if startSeconds >= sourceDuration {
-		return 0, fmt.Errorf("開始時間必須小於影片總長度：開始=%s，影片長度=%s", options.StartTime, formatTimestamp(sourceDuration))
+		return 0, fmt.Errorf("開始時間必須小於影片總長度：開始=%s，影片長度=%s", options.StartTime, util.FormatTimestamp(sourceDuration))
 	}
 
 	if endSeconds <= startSeconds {
@@ -515,19 +521,19 @@ func (service *FFmpegService) updateProgress(output string, suffix byte, totalDu
 		return lastPercent
 	}
 
-	currentSeconds, found := parseFFmpegTimeFromOutput(output)
+	currentSeconds, found := util.ParseFFmpegTimeFromOutput(output)
 	if !found {
 		return lastPercent
 	}
 
-	percent := calculateProgress(currentSeconds, totalDuration)
+	percent := util.CalculateProgress(currentSeconds, totalDuration)
 
 	// 避免同一百分比或差異極小的進度反覆觸發前端重繪
 	if percent-lastPercent < 0.1 {
 		return lastPercent
 	}
 
-	service.emitProgress(FFmpegProgress{CurrentSeconds: currentSeconds, TotalSeconds: totalDuration, Percent: percent})
+	service.emitProgress(utility.FFmpegProgress{CurrentSeconds: currentSeconds, TotalSeconds: totalDuration, Percent: percent})
 	return percent
 }
 
@@ -539,19 +545,19 @@ func (service *FFmpegService) updateProgress(output string, suffix byte, totalDu
 //   - 取消且 FFmpeg 發生錯誤：回傳取消錯誤
 //   - 未取消但 FFmpeg 發生錯誤：回傳 FFmpeg 執行錯誤
 //   - FFmpeg 正常結束：回傳輸出檔案路徑與成功訊息
-func (service *FFmpegService) finalResult(outputPath string, wasCancelled bool, err error) (ConversionResult, error) {
+func (service *FFmpegService) finalResult(outputPath string, wasCancelled bool, err error) (utility.ConversionResult, error) {
 
 	if err != nil {
 		if wasCancelled {
-			return ConversionResult{}, fmt.Errorf("轉換已取消；FFmpeg 未能正常收尾，輸出檔可能不完整：%s", outputPath)
+			return utility.ConversionResult{}, fmt.Errorf("轉換已取消；FFmpeg 未能正常收尾，輸出檔可能不完整：%s", outputPath)
 		}
-		return ConversionResult{}, fmt.Errorf("FFmpeg 執行失敗：%w", err)
+		return utility.ConversionResult{}, fmt.Errorf("FFmpeg 執行失敗：%w", err)
 	}
 
 	if wasCancelled {
-		return ConversionResult{OutputPath: outputPath, Message: "轉換已取消，已保留 FFmpeg 正常收尾的部分輸出：\n" + outputPath}, nil
+		return utility.ConversionResult{OutputPath: outputPath, Message: "轉換已取消，已保留 FFmpeg 正常收尾的部分輸出：\n" + outputPath}, nil
 	}
 
 	service.emitCompleted(outputPath)
-	return ConversionResult{OutputPath: outputPath, Message: "轉換完成：\n" + outputPath}, nil
+	return utility.ConversionResult{OutputPath: outputPath, Message: "轉換完成：\n" + outputPath}, nil
 }

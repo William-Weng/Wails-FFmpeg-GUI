@@ -1,16 +1,21 @@
-package backend
+package utility
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
+)
+
+var ffmpegTimePattern = regexp.MustCompile(
+	`(?:^|\s)time=\s*([0-9:.]+)`,
 )
 
 // 根據目前已處理秒數與總秒數計算百分比
 //
 // - 當 totalDuration 小於或等於 0 時回傳 0
 // - 回傳值會限制在 0 到 100，避免 FFmpeg timestamp、封裝 metadata 或浮點數誤差造成 UI 顯示負數或超過 100%
-func calculateProgress(currentSeconds float64, totalDuration float64) float64 {
+func CalculateProgress(currentSeconds float64, totalDuration float64) float64 {
 
 	if totalDuration <= 0 {
 		return 0
@@ -36,7 +41,7 @@ func calculateProgress(currentSeconds float64, totalDuration float64) float64 {
 //   - FFmpeg status line 中的 time=00:00:51.54
 //
 // 時、分、秒皆不可為負數。回傳結果保留秒數的小數部分
-func parseTimestamp(value string) (float64, error) {
+func ParseTimestamp(value string) (float64, error) {
 	value = strings.TrimSpace(value)
 
 	parts := strings.Split(value, ":")
@@ -71,7 +76,7 @@ func parseTimestamp(value string) (float64, error) {
 	return hours*3600 + minutes*60 + seconds, nil
 }
 
-// formatTimestamp 將秒數格式化為 FFmpeg 可使用的 HH:MM:SS.xx 時間字串
+// 將秒數格式化為 FFmpeg 可使用的 HH:MM:SS.xx 時間字串
 //
 //   - 負數會視為 0
 //   - 秒數保留兩位小數，適合用於 -t 等時間參數
@@ -80,7 +85,7 @@ func parseTimestamp(value string) (float64, error) {
 //   - 0 → "00:00:00.00"
 //   - 51.54 → "00:00:51.54"
 //   - 764 → "00:12:44.00"
-func formatTimestamp(totalSeconds float64) string {
+func FormatTimestamp(totalSeconds float64) string {
 
 	if totalSeconds < 0 {
 		totalSeconds = 0
@@ -93,7 +98,7 @@ func formatTimestamp(totalSeconds float64) string {
 	return fmt.Sprintf("%02d:%02d:%05.2f", hours, minutes, seconds)
 }
 
-// parseFFmpegTimeFromOutput 從一筆 FFmpeg 狀態列擷取 time= 欄位並轉換為秒數
+// 從一筆 FFmpeg 狀態列擷取 time= 欄位並轉換為秒數
 //
 // 範例輸入：
 //
@@ -104,7 +109,7 @@ func formatTimestamp(totalSeconds float64) string {
 //	51.54, true
 //
 // 若該輸出不是進度列、找不到 time=，或時間格式無法解析，則回傳 0, false
-func parseFFmpegTimeFromOutput(line string) (float64, bool) {
+func ParseFFmpegTimeFromOutput(line string) (float64, bool) {
 
 	matches := ffmpegTimePattern.FindStringSubmatch(line)
 
@@ -112,7 +117,7 @@ func parseFFmpegTimeFromOutput(line string) (float64, bool) {
 		return 0, false
 	}
 
-	seconds, err := parseTimestamp(matches[1])
+	seconds, err := ParseTimestamp(matches[1])
 	if err != nil {
 		return 0, false
 	}

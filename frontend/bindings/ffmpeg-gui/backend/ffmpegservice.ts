@@ -12,7 +12,7 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as $models from "./models.js";
+import * as utility$0 from "./utility/models.js";
 
 /**
  * 嘗試取消目前正在執行的 FFmpeg 轉換
@@ -37,7 +37,7 @@ export function CancelConversion(): $CancellablePromise<boolean> {
  * 取得目前 FFmpeg 轉換的狀態
  *   - 函式會使用互斥鎖保護共享狀態，避免在其他 goroutine 修改狀態時讀取到不一致的資料
  */
-export function GetConversionState(): $CancellablePromise<$models.ConversionState> {
+export function GetConversionState(): $CancellablePromise<utility$0.ConversionState> {
     return $Call.ByID(447325734);
 }
 
@@ -63,6 +63,6 @@ export function GetVideoDuration(ffmpegPath: string, inputPath: string): $Cancel
  *   - 轉換成功時，回傳 ConversionResult 與 nil 錯誤
  *   - 轉換失敗時，回傳空的 ConversionResult 與錯誤訊息
  */
-export function StartConversion(options: $models.ConversionOptions): $CancellablePromise<$models.ConversionResult> {
+export function StartConversion(options: utility$0.ConversionOptions): $CancellablePromise<utility$0.ConversionResult> {
     return $Call.ByID(2954419465, options);
 }

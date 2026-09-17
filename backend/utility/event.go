@@ -1,4 +1,4 @@
-package backend
+package utility
 
 // FFmpegEvent 表示 FFmpeg 服務向前端發送的事件名稱
 type FFmpegEvent string
