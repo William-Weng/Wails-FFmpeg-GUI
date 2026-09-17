@@ -68,10 +68,15 @@
       ffmpegProgressAction(event);
     });
 
+    const unsubscribeFFmpegCompleted = Events.On(FFmpegEventType.Completed, (event) => {
+      progress = 100.0
+    });
+
     return () => {
       unsubscribeDrop();
       unsubscribeFFmpegOutput();
       unsubscribeFFmpegProgress();
+      unsubscribeFFmpegCompleted();
     };
   });
 

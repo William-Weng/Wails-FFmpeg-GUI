@@ -117,7 +117,7 @@ func (service *FFmpegService) StartConversion(options ConversionOptions) (Conver
 		return ConversionResult{}, err
 	}
 
-	totalDuration, err := service.GetVideoDuration(options.FFmpegPath, options.InputPath)
+	totalDuration, err := service.parseTotalDuration(options)
 
 	if err != nil {
 		return ConversionResult{}, fmt.Errorf("取得影片長度失敗：%w", err)
@@ -155,7 +155,7 @@ func (service *FFmpegService) StartConversion(options ConversionOptions) (Conver
 	wasCancelled := service.cancelled
 	service.mutex.Unlock()
 
-	return finalResult(outputPath, wasCancelled, err)
+	return service.finalResult(outputPath, wasCancelled, err)
 }
 
 // 嘗試取消目前正在執行的 FFmpeg 轉換
@@ -456,6 +456,54 @@ func (service *FFmpegService) executeFFmpeg(command *exec.Cmd, stderr io.ReadClo
 	return err
 }
 
+// parseTotalDuration 計算本次 FFmpeg 轉換預期輸出的總長度，單位為秒
+//   - 此長度用於計算轉換進度百分比，而不是用於取得來源影片 metadata
+//   - 若未設定剪輯範圍，回傳來源影片完整長度
+//   - 使用者有設定開始時間：輸出從該時間開始
+//   - 使用者有設定結束時間：輸出在來源時間軸的該位置停止
+//   - 避免使用者輸入超出影片長度的 end time
+func (service *FFmpegService) parseTotalDuration(options ConversionOptions) (float64, error) {
+
+	sourceDuration, err := service.GetVideoDuration(options.FFmpegPath, options.InputPath)
+
+	if err != nil {
+		return 0, fmt.Errorf("取得來源影片長度失敗：%w", err)
+	}
+
+	startSeconds := 0.0
+	endSeconds := sourceDuration
+
+	if options.UseStart && strings.TrimSpace(options.StartTime) != "" {
+
+		startSeconds, err = parseTimestamp(options.StartTime)
+
+		if err != nil {
+			return 0, fmt.Errorf("解析開始時間失敗：%w", err)
+		}
+	}
+
+	if options.UseEnd && strings.TrimSpace(options.EndTime) != "" {
+		endSeconds, err = parseTimestamp(options.EndTime)
+		if err != nil {
+			return 0, fmt.Errorf("解析結束時間失敗：%w", err)
+		}
+	}
+
+	if endSeconds > sourceDuration {
+		endSeconds = sourceDuration
+	}
+
+	if startSeconds >= sourceDuration {
+		return 0, fmt.Errorf("開始時間必須小於影片總長度：開始=%s，影片長度=%s", options.StartTime, formatTimestamp(sourceDuration))
+	}
+
+	if endSeconds <= startSeconds {
+		return 0, fmt.Errorf("結束時間必須大於開始時間：開始=%s，結束=%s", options.StartTime, options.EndTime)
+	}
+
+	return endSeconds - startSeconds, nil
+}
+
 // updateProgress 從 FFmpeg 的即時輸出狀態列更新轉換進度
 //   - FFmpeg 的傳統進度列通常以 carriage return（\r）結尾；因此只處理 suffix 為 \r 的輸出，避免一般 metadata、warning、summary 或 error log 也被當作進度解析
 //   - lastPercent 是上一次已發送給前端的百分比。若本次進度與前次差距
@@ -481,4 +529,29 @@ func (service *FFmpegService) updateProgress(output string, suffix byte, totalDu
 
 	service.emitProgress(FFmpegProgress{CurrentSeconds: currentSeconds, TotalSeconds: totalDuration, Percent: percent})
 	return percent
+}
+
+// 根據 FFmpeg 的執行錯誤與取消狀態，建立最終轉換結果
+//   - err 不為 nil 時，表示 FFmpeg 執行失敗
+//   - wasCancelled 為 true 時，表示使用者曾要求取消轉換
+//
+// 回傳結果分為三種情況：
+//   - 取消且 FFmpeg 發生錯誤：回傳取消錯誤
+//   - 未取消但 FFmpeg 發生錯誤：回傳 FFmpeg 執行錯誤
+//   - FFmpeg 正常結束：回傳輸出檔案路徑與成功訊息
+func (service *FFmpegService) finalResult(outputPath string, wasCancelled bool, err error) (ConversionResult, error) {
+
+	if err != nil {
+		if wasCancelled {
+			return ConversionResult{}, fmt.Errorf("轉換已取消；FFmpeg 未能正常收尾，輸出檔可能不完整：%s", outputPath)
+		}
+		return ConversionResult{}, fmt.Errorf("FFmpeg 執行失敗：%w", err)
+	}
+
+	if wasCancelled {
+		return ConversionResult{OutputPath: outputPath, Message: "轉換已取消，已保留 FFmpeg 正常收尾的部分輸出：\n" + outputPath}, nil
+	}
+
+	service.emitCompleted(outputPath)
+	return ConversionResult{OutputPath: outputPath, Message: "轉換完成：\n" + outputPath}, nil
 }

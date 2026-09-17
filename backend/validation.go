@@ -70,27 +70,3 @@ func deriveFFprobePath(ffmpegPath string) string {
 		return "ffprobe"
 	}
 }
-
-// 根據 FFmpeg 的執行錯誤與取消狀態，建立最終轉換結果
-//   - err 不為 nil 時，表示 FFmpeg 執行失敗
-//   - wasCancelled 為 true 時，表示使用者曾要求取消轉換
-//
-// 回傳結果分為三種情況：
-//   - 取消且 FFmpeg 發生錯誤：回傳取消錯誤
-//   - 未取消但 FFmpeg 發生錯誤：回傳 FFmpeg 執行錯誤
-//   - FFmpeg 正常結束：回傳輸出檔案路徑與成功訊息
-func finalResult(outputPath string, wasCancelled bool, err error) (ConversionResult, error) {
-
-	if err != nil {
-		if wasCancelled {
-			return ConversionResult{}, fmt.Errorf("轉換已取消；FFmpeg 未能正常收尾，輸出檔可能不完整：%s", outputPath)
-		}
-		return ConversionResult{}, fmt.Errorf("FFmpeg 執行失敗：%w", err)
-	}
-
-	if wasCancelled {
-		return ConversionResult{OutputPath: outputPath, Message: "轉換已取消，已保留 FFmpeg 正常收尾的部分輸出：\n" + outputPath}, nil
-	}
-
-	return ConversionResult{OutputPath: outputPath, Message: "轉換完成：\n" + outputPath}, nil
-}
