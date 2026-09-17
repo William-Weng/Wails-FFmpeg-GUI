@@ -1,7 +1,6 @@
 <script lang="ts">
-    type Container = "mp4" | "mkv" | "webm" | "ts";
-
-    const containers: Container[] = ["mp4", "mkv", "webm", "ts"];
+    type Container = "mp4" | "mkv" | "ts";
+    const containers: Container[] = ["mp4", "mkv", "ts"];
 
     let { value = $bindable<Container>("mp4"), disabled = false } = $props();
 </script>

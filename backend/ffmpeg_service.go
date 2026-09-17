@@ -106,83 +106,6 @@ func (service *FFmpegService) GetVideoDuration(
 	return duration, nil
 }
 
-func parseFFmpegTimeFromOutput(line string) (float64, bool) {
-	matches := ffmpegTimePattern.FindStringSubmatch(line)
-	if len(matches) != 2 {
-		return 0, false
-	}
-
-	seconds, err := parseFFmpegTimestamp(matches[1])
-	if err != nil {
-		return 0, false
-	}
-
-	return seconds, true
-}
-
-func parseFFmpegTimestamp(value string) (float64, error) {
-	parts := strings.Split(value, ":")
-	if len(parts) != 3 {
-		return 0, fmt.Errorf("無效的 FFmpeg 時間：%q", value)
-	}
-
-	hours, err := strconv.ParseFloat(parts[0], 64)
-	if err != nil {
-		return 0, fmt.Errorf("解析小時失敗：%w", err)
-	}
-
-	minutes, err := strconv.ParseFloat(parts[1], 64)
-	if err != nil {
-		return 0, fmt.Errorf("解析分鐘失敗：%w", err)
-	}
-
-	seconds, err := strconv.ParseFloat(parts[2], 64)
-	if err != nil {
-		return 0, fmt.Errorf("解析秒數失敗：%w", err)
-	}
-
-	return hours*3600 + minutes*60 + seconds, nil
-}
-
-func parseFFmpegProgressTime(line string) (float64, bool) {
-
-	matches := ffmpegTimePattern.FindStringSubmatch(line)
-	if len(matches) != 2 {
-		return 0, false
-	}
-
-	seconds, err := parseFFmpegTime(matches[1])
-	if err != nil {
-		return 0, false
-	}
-
-	return seconds, true
-}
-
-func parseFFmpegTime(value string) (float64, error) {
-	parts := strings.Split(value, ":")
-	if len(parts) != 3 {
-		return 0, fmt.Errorf("無效的 FFmpeg time: %q", value)
-	}
-
-	hours, err := strconv.ParseFloat(parts[0], 64)
-	if err != nil {
-		return 0, err
-	}
-
-	minutes, err := strconv.ParseFloat(parts[1], 64)
-	if err != nil {
-		return 0, err
-	}
-
-	seconds, err := strconv.ParseFloat(parts[2], 64)
-	if err != nil {
-		return 0, err
-	}
-
-	return hours*3600 + minutes*60 + seconds, nil
-}
-
 // StartConversion 啟動一次 FFmpeg 影片轉換工作
 //   - 函式會先驗證輸入檔案，接著建立輸出路徑與 FFmpeg 參數，然後啟動 FFmpeg 並即時讀取其 stderr 輸出
 //   - 不使用 -nostdin，才能在取消時對 FFmpeg 寫入 `q`
@@ -217,7 +140,11 @@ func (service *FFmpegService) StartConversion(options ConversionOptions) (Conver
 
 	defer service.clearRunningState()
 
-	command, outputPath := service.buildFFmpegCommand(options)
+	command, outputPath, err := service.buildFFmpegCommand(options)
+	if err != nil {
+		return ConversionResult{}, err
+	}
+
 	stdin, stderr, err := createFFmpegPipes(command)
 	if err != nil {
 		return ConversionResult{}, err
@@ -352,59 +279,59 @@ func (service *FFmpegService) emitOutput(line string) {
 	service.App.Event.Emit(FFmpegEventOutput.String(), FFmpegOutput{Line: line})
 }
 
+// emitProgress 發送 FFmpeg 目前的轉換進度
+//   - 沒有 Wails App 時，進度會輸出至終端機，方便測試或以獨立模式執行
+//   - 有 Wails App 時，會透過 ffmpeg:progress 事件將 FFmpegProgress
+//   - 資料傳送給前端，用於更新進度條、處理時間與百分比
 func (service *FFmpegService) emitProgress(progress FFmpegProgress) {
 
 	if service.App == nil {
-		fmt.Printf(
-			"FFmpeg progress: %.1f%% (%.2f / %.2f sec)\n",
-			progress.Percent,
-			progress.CurrentSeconds,
-			progress.TotalSeconds,
-		)
+		fmt.Printf("FFmpeg progress: %.1f%% (%.2f / %.2f sec)\n", progress.Percent, progress.CurrentSeconds, progress.TotalSeconds)
 		return
 	}
 
-	service.App.Event.Emit(
-		string(FFmpegEventProgress),
-		progress,
-	)
+	service.App.Event.Emit(FFmpegEventProgress.String(), progress)
 }
 
+// emitCompleted 發送 FFmpeg 成功完成轉換的事件
+//
+//   - 沒有 Wails App 時，完成結果會輸出至終端機
+//   - 有 Wails App 時，會透過 ffmpeg:completed 事件將輸出檔案路徑
+//   - 包裝為 FFmpegCompleted 資料傳送給前端
 func (service *FFmpegService) emitCompleted(outputPath string) {
+
 	if service.App == nil {
 		fmt.Printf("FFmpeg completed: %s\n", outputPath)
 		return
 	}
 
-	service.App.Event.Emit(
-		string(FFmpegEventCompleted),
-		FFmpegCompleted{
-			OutputPath: outputPath,
-		},
-	)
+	service.App.Event.Emit(FFmpegEventCompleted.String(), FFmpegCompleted{OutputPath: outputPath})
 }
 
+// emitFailed 發送 FFmpeg 轉換失敗的事件
+//
+//   - 沒有 Wails App 時，錯誤會輸出至終端機
+//   - 有 Wails App 時，會透過 ffmpeg:failed 事件將錯誤訊息包裝為
+//   - FFmpegFailed 資料傳送給前端
 func (service *FFmpegService) emitFailed(err error) {
+
+	if err == nil {
+		return
+	}
+
 	if service.App == nil {
 		fmt.Printf("FFmpeg failed: %v\n", err)
 		return
 	}
 
-	service.App.Event.Emit(
-		string(FFmpegEventFailed),
-		FFmpegFailed{
-			Message: err.Error(),
-		},
-	)
+	service.App.Event.Emit(FFmpegEventFailed.String(), FFmpegFailed{Message: err.Error()})
 }
 
 // 從 reader 逐字元讀取 FFmpeg 的輸出內容，每次只從 reader 讀取一個字元
 //   - 當讀到換行字元（\n）或回車字元（\r）時，就將目前累積的內容傳送給前端
 //   - 如果輸入串流結束時仍有尚未傳送的內容，函式會在收到 io.EOF 時一併送出最後一行
-func (service *FFmpegService) streamFFmpegOutput(
-	reader io.Reader,
-	totalDuration float64,
-) {
+func (service *FFmpegService) streamFFmpegOutput(reader io.Reader, totalDuration float64) {
+
 	buffer := make([]byte, 1)
 	var line strings.Builder
 
@@ -455,61 +382,6 @@ func (service *FFmpegService) streamFFmpegOutput(
 	}
 }
 
-func calculateProgress(
-	currentSeconds float64,
-	totalDuration float64,
-) float64 {
-	if totalDuration <= 0 {
-		return 0
-	}
-
-	percent := currentSeconds / totalDuration * 100
-
-	if percent < 0 {
-		return 0
-	}
-
-	if percent > 100 {
-		return 100
-	}
-
-	return percent
-}
-
-func (service *FFmpegService) updateProgress(
-	output string,
-	suffix byte,
-	totalDuration float64,
-	lastPercent float64,
-) float64 {
-	if suffix != '\r' {
-		return lastPercent
-	}
-
-	currentSeconds, found := parseFFmpegTimeFromOutput(output)
-	if !found {
-		return lastPercent
-	}
-
-	percent := calculateProgress(
-		currentSeconds,
-		totalDuration,
-	)
-
-	// 避免同一百分比或差異極小的進度反覆觸發前端重繪。
-	if percent-lastPercent < 0.1 {
-		return lastPercent
-	}
-
-	service.emitProgress(FFmpegProgress{
-		CurrentSeconds: currentSeconds,
-		TotalSeconds:   totalDuration,
-		Percent:        percent,
-	})
-
-	return percent
-}
-
 // 根據影片轉換選項和輸出檔案路徑，建立 FFmpeg 命令列所需的參數列表；此函式只負責組合參數，不會實際執行 FFmpeg
 //
 // 例如：
@@ -521,33 +393,58 @@ func (service *FFmpegService) updateProgress(
 //
 // 回傳：
 //   - 可傳給 exec.Command 或 exec.CommandContext 的 FFmpeg 參數列表
-func buildFFmpegArguments(options ConversionOptions, outputPath string) []string {
+func buildFFmpegArguments(options ConversionOptions, outputPath string) ([]string, error) {
 
 	args := []string{"-y"}
 
+	startSeconds := 0.0
+
 	if options.UseStart && options.StartTime != "" {
+		seconds, err := parseTimestamp(options.StartTime)
+		if err != nil {
+			return nil, fmt.Errorf("無效開始時間：%w", err)
+		}
+
+		startSeconds = seconds
 		args = append(args, "-ss", options.StartTime)
 	}
 
-	args = append(args, "-i", options.InputPath)
-
 	if options.UseEnd && options.EndTime != "" {
-		args = append(args, "-to", options.EndTime)
+		endSeconds, err := parseTimestamp(options.EndTime)
+		if err != nil {
+			return nil, fmt.Errorf("無效結束時間：%w", err)
+		}
+
+		durationSeconds := endSeconds - startSeconds
+		if durationSeconds <= 0 {
+			return nil, fmt.Errorf(
+				"結束時間必須大於開始時間：開始=%s，結束=%s",
+				options.StartTime,
+				options.EndTime,
+			)
+		}
+
+		args = append(args, "-t", formatTimestamp(durationSeconds))
 	}
+
+	args = append(args, "-i", options.InputPath)
 
 	codec := strings.ToLower(strings.TrimSpace(options.VideoCodec))
 
 	switch codec {
 	case "copy":
-
 		if options.UseSize {
 			fmt.Println("警告：Copy 模式忽略尺寸設定")
 		}
 
-		args = append(args, "-map", "0:v:0", "-map", "0:a?", "-c", "copy")
+		args = append(
+			args,
+			"-map", "0:v:0",
+			"-map", "0:a?",
+			"-c", "copy",
+		)
 
 	case "h264":
-
 		if options.UseSize && options.Width > 0 && options.Height > 0 {
 			scale := fmt.Sprintf("scale=%d:%d", options.Width, options.Height)
 			args = append(args, "-vf", scale)
@@ -556,7 +453,6 @@ func buildFFmpegArguments(options ConversionOptions, outputPath string) []string
 		args = append(args, "-c:v", "libx264", "-c:a", "aac")
 
 	case "h265":
-
 		if options.UseSize && options.Width > 0 && options.Height > 0 {
 			scale := fmt.Sprintf("scale=%d:%d", options.Width, options.Height)
 			args = append(args, "-vf", scale)
@@ -570,55 +466,7 @@ func buildFFmpegArguments(options ConversionOptions, outputPath string) []string
 
 	args = append(args, outputPath)
 
-	return args
-}
-
-// checkFileExists 驗證輸入影片是否存在且可存取
-func checkFileExists(options ConversionOptions) error {
-
-	if options.InputPath == "" {
-		return errors.New("請先選擇輸入影片")
-	}
-
-	return checkInputFile(options.InputPath)
-}
-
-func checkInputFile(inputPath string) error {
-	info, err := os.Stat(inputPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return fmt.Errorf("輸入檔案不存在：%w", err)
-		}
-
-		return fmt.Errorf("無法讀取輸入檔案：%w", err)
-	}
-
-	if info.IsDir() {
-		return errors.New("輸入路徑不是影片檔案，而是資料夾")
-	}
-
-	return nil
-}
-
-func deriveFFprobePath(ffmpegPath string) string {
-	if ffmpegPath == "" {
-		return "ffprobe"
-	}
-
-	ffmpegPath = filepath.Clean(ffmpegPath)
-	dir := filepath.Dir(ffmpegPath)
-	base := filepath.Base(ffmpegPath)
-
-	switch base {
-	case "ffmpeg":
-		return filepath.Join(dir, "ffprobe")
-
-	case "ffmpeg.exe":
-		return filepath.Join(dir, "ffprobe.exe")
-
-	default:
-		return "ffprobe"
-	}
+	return args, nil
 }
 
 // beginConversion 檢查目前是否已有 FFmpeg 轉換正在執行，並在沒有其他轉換時初始化新的轉換狀態
@@ -652,21 +500,41 @@ func (service *FFmpegService) commandContext() context.Context {
 	return service.App.Context()
 }
 
-// 根據轉換選項建立 FFmpeg 命令；函式會準備 FFmpeg 執行檔路徑、輸出路徑和命令列參數，並回傳尚未啟動的 *exec.Cmd
-//   - 此函式只建立命令，不會執行 FFmpeg；必須另外呼叫 command.Start()、command.Run() 或 command.Output() 才會真正啟動外部程序。
-func (service *FFmpegService) buildFFmpegCommand(options ConversionOptions) (*exec.Cmd, string) {
+// buildFFmpegCommand 根據轉換選項建立尚未啟動的 FFmpeg 命令。
+//
+// 此方法會標準化輸出容器格式、建立輸出檔案路徑、產生 FFmpeg
+// 命令列參數，並使用 ConversionOptions.FFmpegPath 建立 *exec.Cmd。
+// 若 FFmpegPath 為空字串，則使用系統 PATH 中的 "ffmpeg"。
+//
+// 回傳值依序為：
+//   - *exec.Cmd：尚未啟動的 FFmpeg 命令。
+//   - string：預計產生的輸出影片路徑。
+//   - error：建立參數或命令時發生的錯誤。
+//
+// 此方法只建立命令，不會執行 FFmpeg；呼叫端需使用 command.Start()、
+// command.Run()、command.Wait() 或 command.Output() 啟動或等待外部程序。
+func (service *FFmpegService) buildFFmpegCommand(options ConversionOptions) (*exec.Cmd, string, error) {
 
 	container := normalizeContainer(options.Container)
 	outputPath := makeOutputPath(options.InputPath, container)
-	args := buildFFmpegArguments(options, outputPath)
-	ffmpegPath := strings.TrimSpace(options.FFmpegPath)
 
+	args, err := buildFFmpegArguments(options, outputPath)
+	if err != nil {
+		return nil, "", err
+	}
+
+	ffmpegPath := strings.TrimSpace(options.FFmpegPath)
 	if ffmpegPath == "" {
 		ffmpegPath = "ffmpeg"
 	}
 
-	command := exec.CommandContext(service.commandContext(), ffmpegPath, args...)
-	return command, outputPath
+	command := exec.CommandContext(
+		service.commandContext(),
+		ffmpegPath,
+		args...,
+	)
+
+	return command, outputPath, nil
 }
 
 // 建立 FFmpeg 命令的標準輸入與標準錯誤輸出管道
@@ -719,6 +587,45 @@ func (service *FFmpegService) executeFFmpeg(command *exec.Cmd, stderr io.ReadClo
 	return err
 }
 
+// updateProgress 從 FFmpeg 的即時輸出狀態列更新轉換進度。
+//
+// FFmpeg 的傳統進度列通常以 carriage return（\r）結尾；
+// 因此只處理 suffix 為 \r 的輸出，避免一般 metadata、warning、
+// summary 或 error log 也被當作進度解析。
+//
+// lastPercent 是上一次已發送給前端的百分比。若本次進度與前次差距
+// 小於 0.1%，不發送事件並回傳原值，以減少 Wails event 與 UI 重繪。
+// 回傳值必須由呼叫端保存，作為下一次的 lastPercent。
+func (service *FFmpegService) updateProgress(output string, suffix byte, totalDuration float64, lastPercent float64) float64 {
+
+	if suffix != '\r' {
+		return lastPercent
+	}
+
+	currentSeconds, found := parseFFmpegTimeFromOutput(output)
+	if !found {
+		return lastPercent
+	}
+
+	percent := calculateProgress(
+		currentSeconds,
+		totalDuration,
+	)
+
+	// 避免同一百分比或差異極小的進度反覆觸發前端重繪。
+	if percent-lastPercent < 0.1 {
+		return lastPercent
+	}
+
+	service.emitProgress(FFmpegProgress{
+		CurrentSeconds: currentSeconds,
+		TotalSeconds:   totalDuration,
+		Percent:        percent,
+	})
+
+	return percent
+}
+
 // 根據 FFmpeg 的執行錯誤與取消狀態，建立最終轉換結果
 //   - err 不為 nil 時，表示 FFmpeg 執行失敗
 //   - wasCancelled 為 true 時，表示使用者曾要求取消轉換
@@ -737,16 +644,10 @@ func finalResult(outputPath string, wasCancelled bool, err error) (ConversionRes
 	}
 
 	if wasCancelled {
-		return ConversionResult{
-			OutputPath: outputPath,
-			Message:    "轉換已取消，已保留 FFmpeg 正常收尾的部分輸出：\n" + outputPath,
-		}, nil
+		return ConversionResult{OutputPath: outputPath, Message: "轉換已取消，已保留 FFmpeg 正常收尾的部分輸出：\n" + outputPath}, nil
 	}
 
-	return ConversionResult{
-		OutputPath: outputPath,
-		Message:    "轉換完成：\n" + outputPath,
-	}, nil
+	return ConversionResult{OutputPath: outputPath, Message: "轉換完成：\n" + outputPath}, nil
 }
 
 // 去除前後空白，並將英文字母轉成小寫；例如： ".MP4"  -> "mp4"
@@ -756,14 +657,14 @@ func normalizeContainer(value string) string {
 	value = strings.TrimPrefix(value, ".")
 
 	switch value {
-	case "mkv", "webm", "ts":
+	case "mkv", "ts":
 		return value
 	default:
 		return "mp4"
 	}
 }
 
-// makeOutputPath 會根據輸入檔案路徑與容器格式，產生新的輸出檔案路徑；輸出檔案會保留原始檔案所在的資料夾與檔名，並在副檔名前加入時間戳記
+// 會根據輸入檔案路徑與容器格式，產生新的輸出檔案路徑；輸出檔案會保留原始檔案所在的資料夾與檔名，並在副檔名前加入時間戳記
 //
 // 例如：
 //
@@ -778,4 +679,186 @@ func makeOutputPath(inputPath string, container string) string {
 	timestamp := time.Now().Format("20060102-150405.000")
 
 	return fmt.Sprintf("%s_%s.%s", base, timestamp, container)
+}
+
+// 驗證轉換選項是否已指定輸入影片，並確認輸入路徑存在、可存取且不是資料夾
+func checkFileExists(options ConversionOptions) error {
+
+	if strings.TrimSpace(options.InputPath) == "" {
+		return errors.New("請先選擇輸入影片")
+	}
+
+	return checkInputFile(options.InputPath)
+}
+
+// 驗證指定路徑是否為存在且可存取的一般檔案
+//
+//   - 此函式只確認檔案存在且不是資料夾；不驗證副檔名、MIME type 或 FFmpeg 是否實際支援該媒體格式
+func checkInputFile(inputPath string) error {
+
+	info, err := os.Stat(inputPath)
+
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("輸入檔案不存在：%w", err)
+		}
+		return fmt.Errorf("無法讀取輸入檔案：%w", err)
+	}
+
+	if info.IsDir() {
+		return errors.New("輸入路徑不是影片檔案，而是資料夾")
+	}
+
+	return nil
+}
+
+// 根據 FFmpeg 執行檔路徑推導同目錄的 ffprobe 路徑
+//
+//   - 若 ffmpegPath 為空，回傳 "ffprobe"，由系統 PATH 尋找
+//   - 若檔名不是 "ffmpeg" 或 "ffmpeg.exe"，同樣回傳 "ffprobe"
+//
+// 範例：
+//   - "/opt/homebrew/bin/ffmpeg" → "/opt/homebrew/bin/ffprobe"
+//   - "C:\\tools\\ffmpeg.exe" → "C:\\tools\\ffprobe.exe"
+func deriveFFprobePath(ffmpegPath string) string {
+
+	ffmpegPath = strings.TrimSpace(ffmpegPath)
+
+	if ffmpegPath == "" {
+		return "ffprobe"
+	}
+
+	ffmpegPath = filepath.Clean(ffmpegPath)
+	dir := filepath.Dir(ffmpegPath)
+	base := filepath.Base(ffmpegPath)
+
+	switch base {
+	case "ffmpeg":
+		return filepath.Join(dir, "ffprobe")
+
+	case "ffmpeg.exe":
+		return filepath.Join(dir, "ffprobe.exe")
+
+	default:
+		return "ffprobe"
+	}
+}
+
+// 根據目前已處理秒數與總秒數計算百分比
+//
+// - 當 totalDuration 小於或等於 0 時回傳 0
+// - 回傳值會限制在 0 到 100，避免 FFmpeg timestamp、封裝 metadata 或浮點數誤差造成 UI 顯示負數或超過 100%
+func calculateProgress(currentSeconds float64, totalDuration float64) float64 {
+
+	if totalDuration <= 0 {
+		return 0
+	}
+
+	percent := currentSeconds / totalDuration * 100
+
+	if percent < 0 {
+		return 0
+	}
+
+	if percent > 100 {
+		return 100
+	}
+
+	return percent
+}
+
+// 將 HH:MM:SS 或 HH:MM:SS.xx 格式的時間轉換為秒數
+//
+// 此函式同時用於：
+//   - 使用者輸入的開始與結束時間
+//   - FFmpeg status line 中的 time=00:00:51.54
+//
+// 時、分、秒皆不可為負數。回傳結果保留秒數的小數部分
+func parseTimestamp(value string) (float64, error) {
+	value = strings.TrimSpace(value)
+
+	parts := strings.Split(value, ":")
+	if len(parts) != 3 {
+		return 0, fmt.Errorf("無效時間格式 %q，預期 HH:MM:SS 或 HH:MM:SS.xx", value)
+	}
+
+	hours, err := strconv.ParseFloat(parts[0], 64)
+	if err != nil {
+		return 0, fmt.Errorf("解析小時失敗：%w", err)
+	}
+
+	minutes, err := strconv.ParseFloat(parts[1], 64)
+	if err != nil {
+		return 0, fmt.Errorf("解析分鐘失敗：%w", err)
+	}
+
+	seconds, err := strconv.ParseFloat(parts[2], 64)
+	if err != nil {
+		return 0, fmt.Errorf("解析秒數失敗：%w", err)
+	}
+
+	if hours < 0 || minutes < 0 || seconds < 0 {
+		return 0, fmt.Errorf("時間不可為負數：%q", value)
+	}
+
+	// 可選但建議：防止 00:99:99 這類不符合時鐘格式的輸入。
+	if minutes >= 60 || seconds >= 60 {
+		return 0, fmt.Errorf("分鐘與秒數必須小於 60：%q", value)
+	}
+
+	return hours*3600 + minutes*60 + seconds, nil
+}
+
+// formatTimestamp 將秒數格式化為 FFmpeg 可使用的 HH:MM:SS.xx 時間字串
+//
+//   - 負數會視為 0
+//   - 秒數保留兩位小數，適合用於 -t 等時間參數
+//
+// 範例：
+//   - 0 → "00:00:00.00"
+//   - 51.54 → "00:00:51.54"
+//   - 764 → "00:12:44.00"
+func formatTimestamp(totalSeconds float64) string {
+
+	if totalSeconds < 0 {
+		totalSeconds = 0
+	}
+
+	hours := int(totalSeconds) / 3600
+	minutes := (int(totalSeconds) % 3600) / 60
+	seconds := totalSeconds - float64(hours*3600+minutes*60)
+
+	return fmt.Sprintf(
+		"%02d:%02d:%05.2f",
+		hours,
+		minutes,
+		seconds,
+	)
+}
+
+// parseFFmpegTimeFromOutput 從一筆 FFmpeg 狀態列擷取 time= 欄位並轉換為秒數
+//
+// 範例輸入：
+//
+//	"frame=1240 fps=388 time=00:00:51.54 bitrate=564.0kbits/s"
+//
+// 成功時回傳：
+//
+//	51.54, true
+//
+// 若該輸出不是進度列、找不到 time=，或時間格式無法解析，則回傳 0, false
+func parseFFmpegTimeFromOutput(line string) (float64, bool) {
+
+	matches := ffmpegTimePattern.FindStringSubmatch(line)
+
+	if len(matches) != 2 {
+		return 0, false
+	}
+
+	seconds, err := parseTimestamp(matches[1])
+	if err != nil {
+		return 0, false
+	}
+
+	return seconds, true
 }

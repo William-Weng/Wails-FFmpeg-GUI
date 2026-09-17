@@ -16,7 +16,7 @@
 
   let ffmpegPath = "/opt/homebrew/bin/ffmpeg";
   let inputPath = "";
-  let container: "mp4" | "mkv" | "webm" | "ts" = "mp4";
+  let container: "mp4" | "mkv" | "ts" = "mp4";
   let videoCodec: "copy" | "h264" | "h265" = "copy";
 
   let enableStart = false;
@@ -188,7 +188,6 @@
       });
 
       logText += `\n----- 轉換完成 -----\n${result.message}`;
-      progress = 100.0
       await _scrollLogToBottom();
     } catch (error) {
       logText += `\n----- 轉換失敗 -----\n${String(error)}`;
