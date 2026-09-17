@@ -192,7 +192,7 @@
         useSize: enableSize,
       });
 
-      logText += `\n----- 轉換完成 -----\n${result.message}`;
+      logText += `${result.message}`;
       await _scrollLogToBottom();
     } catch (error) {
       logText += `\n----- 轉換失敗 -----\n${String(error)}`;

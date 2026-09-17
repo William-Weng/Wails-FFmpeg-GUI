@@ -441,7 +441,7 @@ func (service *FFmpegService) buildFFmpegCommand(options utility.ConversionOptio
 func (service *FFmpegService) executeFFmpeg(command *exec.Cmd, stderr io.ReadCloser, totalDuration float64) error {
 
 	service.emitOutput(fmt.Sprintf("\n\n----- FFmpeg 指令 -----\n%s\n", command.String()))
-	service.emitOutput("----- FFmpeg 輸出 -----")
+	service.emitOutput("\n----- FFmpeg 輸出 -----")
 
 	if err := command.Start(); err != nil {
 		_ = stderr.Close()
@@ -555,9 +555,9 @@ func (service *FFmpegService) finalResult(outputPath string, wasCancelled bool, 
 	}
 
 	if wasCancelled {
-		return utility.ConversionResult{OutputPath: outputPath, Message: "轉換已取消，已保留 FFmpeg 正常收尾的部分輸出：\n" + outputPath}, nil
+		return utility.ConversionResult{OutputPath: outputPath, Message: "\n----- 轉換已取消 -----\n已保留 FFmpeg 正常收尾的部分輸出：\n" + outputPath}, nil
 	}
 
 	service.emitCompleted(outputPath)
-	return utility.ConversionResult{OutputPath: outputPath, Message: "轉換完成：\n" + outputPath}, nil
+	return utility.ConversionResult{OutputPath: outputPath, Message: "\n----- 轉換完成 -----\n" + outputPath}, nil
 }
