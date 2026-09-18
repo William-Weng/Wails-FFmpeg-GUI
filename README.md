@@ -1,4 +1,4 @@
-# Wails FFmpeg GUI
+# [Wails FFmpeg GUI](https://v3.wails.io/zh-tw/reference/cli/)
 
 ![Go](https://img.shields.io/badge/Go-1.27.1-00ADD8?logo=go&logoColor=white)
 ![Node.js](https://img.shields.io/badge/Node.js-20.19.2-339933?logo=nodedotjs&logoColor=white)
@@ -13,7 +13,7 @@
 
 https://github.com/user-attachments/assets/1722df33-e8fc-443d-b3f6-c8b8b7cc6798
 
-## 功能特色
+## [功能特色](https://v3.wails.io/zh-tw/concepts/build-system/)
 
 - 透過圖形化介面設定輸入與輸出影片。
 - 支援 FFmpeg command 預覽。
@@ -38,7 +38,7 @@ Go service
 FFmpeg
 ```
 
-## 作業環境
+## [作業環境](https://v3.wails.io/zh-tw/concepts/build-system/)
 
 | 項目 | 版本 |
 | --- | --- |
@@ -226,6 +226,8 @@ wails3 task package
 ## 更換應用程式圖示
 
 Wails 3 以 `build/appicon.png` 作為主圖示來源，再產生 macOS、Windows、Linux、iOS 與 Android 等平台所需的圖示資源。
+
+> wails3 task common:update:build-assets
 
 ### 圖示規格
 
