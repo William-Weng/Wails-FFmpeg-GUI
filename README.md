@@ -11,7 +11,7 @@
 
 目前主要以 macOS 開發與測試，提供 FFmpeg 指令預覽、複製與影片轉換功能，方便在圖形化介面與 Terminal 指令之間切換。
 
-https://github.com/user-attachments/assets/1722df33-e8fc-443d-b3f6-c8b8b7cc6798
+https://github.com/user-attachments/assets/f3506a5a-b0a6-455b-8476-b134e6e7e833
 
 ## [功能特色](https://v3.wails.io/zh-tw/concepts/build-system/)
 
