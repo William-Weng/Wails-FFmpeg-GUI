@@ -1,8 +1,17 @@
 <script lang="ts">
-    type Container = "mp4" | "mkv" | "ts";
-    const containers: Container[] = ["mp4", "mkv", "ts"];
+    import { Containers } from "../constants/media";
+    import type { Container } from "../constants/media";
 
-    let { value = $bindable<Container>("mp4"), disabled = false } = $props();
+    const containers: readonly Container[] = [
+        Containers.MP4,
+        Containers.MKV,
+        Containers.TS,
+        Containers.MP3,
+        Containers.AAC,
+        Containers.OGG,
+    ];
+
+    let { value = $bindable<Container>(containers[0]), disabled = false } = $props();
 </script>
 
 <select class="select-input" bind:value {disabled} aria-label="輸出格式">

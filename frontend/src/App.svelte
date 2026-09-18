@@ -1,8 +1,11 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
   import { Events, Dialogs } from "@wailsio/runtime";
+
   import { WailsEventType, FFmpegEventType } from "./constants/events";
+  import { Containers, VideoCodecs } from "./constants/media";
   import type { FFmpegOutput, FFmpegProgress } from "./constants/models";
+  import type { Container, VideoCodec } from "./constants/media";
 
   import FFmpegPathInput from "./components/FfmpegPathInput.svelte";
   import FilePathInput from "./components/FilePathInput.svelte";
@@ -12,15 +15,15 @@
   import TimeOptionRow from "./components/TimeOptionRow.svelte";
   import SizeOptionRow from "./components/SizeOptionRow.svelte";
 
-  import { StartConversion, CancelConversion, GetVideoDuration } from "../bindings/ffmpeg-gui/backend/ffmpegservice";
+  import { StartConversion, CancelConversion, GetVideoDuration, DetectMediaType } from "../bindings/ffmpeg-gui/backend/ffmpegservice";
   import { Print } from "../bindings/ffmpeg-gui/backend/tools";
 
   type DialogType = "info" | "error" | "warning";
 
   let ffmpegPath = "/opt/homebrew/bin/ffmpeg";
   let inputPath = "";
-  let container: "mp4" | "mkv" | "ts" = "mp4";
-  let videoCodec: "copy" | "h264" | "h265" = "copy";
+  let container: Container = Containers.MP4
+  let videoCodec: VideoCodec = VideoCodecs.Copy
 
   let enableStart = false;
   let enableEnd = false;
@@ -28,6 +31,7 @@
   let converting = false;
   let cancelling = false;
 
+  let isVideo = false
   let videoDuration = 0;
   let videoDurationText = "";
   let startTime = "00:00:00";
@@ -103,12 +107,16 @@
     }
 
     inputPath = files[0];
-    logText = `已成功選擇影片：${inputPath}`;
+    logText = `已成功選擇媒體：${inputPath}`;
 
     try {
       videoDuration = await GetVideoDuration(ffmpegPath, inputPath);
       videoDurationText = _formatDuration(videoDuration);
-      logText += `\n影片長度：${videoDurationText}`;
+      
+      isVideo = (await DetectMediaType(ffmpegPath, inputPath) == "video")
+      if (!isVideo) { videoCodec = VideoCodecs.Copy }
+
+      logText += `\n媒體長度：${videoDurationText}`;
     } catch (error) {
       videoDuration = 0;
       videoDurationText = "";
@@ -376,7 +384,7 @@
       <div class="form-row file-row">
         <FilePathInput value={inputPath} />
         <OutputFormatSelect bind:value={container} disabled={converting} />
-        <VideoCodecSelect bind:value={videoCodec} disabled={converting} />
+        <VideoCodecSelect bind:value={videoCodec} disabled={converting || !isVideo} />
         <ConvertButton {videoDuration} {converting} {cancelling} hasInput={Boolean(inputPath)} onclick={handleConvertButton} />
       </div>
 

@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
-	"strconv"
 	"strings"
 	"time"
 
@@ -63,6 +62,42 @@ func NewFFmpegService() *FFmpegService {
 	return &FFmpegService{}
 }
 
+// DetectMediaType
+func (service *FFmpegService) DetectMediaType(ffmpegPath string, inputPath string) (mediaType string, err error) {
+
+	inputPath = strings.TrimSpace(inputPath)
+	ffmpegPath = strings.TrimSpace(ffmpegPath)
+
+	if inputPath == "" {
+		return "", errors.New("請先選擇輸入影片")
+	}
+
+	if err := util.CheckInputFile(inputPath); err != nil {
+		return "", err
+	}
+
+	ffprobePath := util.DeriveFFprobePath(ffmpegPath)
+
+	isVideo, isAudio, err := util.DetectMediaType(ffprobePath, inputPath)
+
+	if err != nil {
+		return "", err
+	}
+
+	print("isVideo = %t", isVideo)
+	print("isAudio = %t", isAudio)
+
+	if isVideo {
+		return "video", nil
+	}
+
+	if isAudio {
+		return "audio", nil
+	}
+
+	return "unknown", nil
+}
+
 //	使用 ffprobe 取得影片長度，單位為秒
 //
 // 回傳：
@@ -82,34 +117,7 @@ func (service *FFmpegService) GetVideoDuration(ffmpegPath string, inputPath stri
 	}
 
 	ffprobePath := util.DeriveFFprobePath(ffmpegPath)
-
-	command := exec.CommandContext(
-		service.commandContext(),
-		ffprobePath,
-		"-v", "error",
-		"-show_entries", "format=duration",
-		"-of", "default=noprint_wrappers=1:nokey=1",
-		inputPath,
-	)
-
-	output, err := command.Output()
-	if err != nil {
-		return 0, fmt.Errorf("ffprobe 執行失敗：%w", err)
-	}
-
-	duration, err := strconv.ParseFloat(
-		strings.TrimSpace(string(output)),
-		64,
-	)
-	if err != nil {
-		return 0, fmt.Errorf("無法解析影片長度：%w", err)
-	}
-
-	if duration <= 0 {
-		return 0, errors.New("影片長度必須大於 0")
-	}
-
-	return duration, nil
+	return util.DetectMediaDuration(service.commandContext(), ffprobePath, inputPath)
 }
 
 // 啟動一次 FFmpeg 影片轉換工作

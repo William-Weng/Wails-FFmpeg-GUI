@@ -22,6 +22,13 @@ type FFmpegFailed struct {
 	Message string `json:"message"` // Message 是可供前端顯示或寫入 log 的錯誤訊息
 }
 
+// FFprobeResult 對應 ffprobe -show_streams -print_format json 的輸出
+type FFprobeResult struct {
+	Streams []struct {
+		CodecType string `json:"codec_type"` // "video", "audio", "subtitle", ...
+	} `json:"streams"`
+}
+
 // ConversionOptions 定義影片轉換時所需的設定
 type ConversionOptions struct {
 	InputPath  string `json:"inputPath"`  // InputPath 是輸入影片的檔案路徑

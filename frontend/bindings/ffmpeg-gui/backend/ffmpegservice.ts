@@ -34,6 +34,13 @@ export function CancelConversion(): $CancellablePromise<boolean> {
 }
 
 /**
+ * DetectMediaType
+ */
+export function DetectMediaType(ffmpegPath: string, inputPath: string): $CancellablePromise<string> {
+    return $Call.ByID(1242266760, ffmpegPath, inputPath);
+}
+
+/**
  * 取得目前 FFmpeg 轉換的狀態
  *   - 函式會使用互斥鎖保護共享狀態，避免在其他 goroutine 修改狀態時讀取到不一致的資料
  */
