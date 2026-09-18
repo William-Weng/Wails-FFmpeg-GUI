@@ -130,7 +130,7 @@ func (service *FFmpegService) StartConversion(options utility.ConversionOptions)
 	totalDuration, err := service.parseTotalDuration(options)
 
 	if err != nil {
-		return utility.ConversionResult{}, fmt.Errorf("取得影片長度失敗：%w", err)
+		return utility.ConversionResult{}, err
 	}
 
 	if err := service.beginConversion(); err != nil {
@@ -473,7 +473,7 @@ func (service *FFmpegService) parseTotalDuration(options utility.ConversionOptio
 	sourceDuration, err := service.GetVideoDuration(options.FFmpegPath, options.InputPath)
 
 	if err != nil {
-		return 0, fmt.Errorf("取得來源影片長度失敗：%w", err)
+		return 0, err
 	}
 
 	startSeconds := 0.0

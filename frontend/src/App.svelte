@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
-  import { Events } from "@wailsio/runtime";
+  import { Events, Dialogs } from "@wailsio/runtime";
   import { WailsEventType, FFmpegEventType } from "./constants/events";
   import type { FFmpegOutput, FFmpegProgress } from "./constants/models";
 
@@ -14,6 +14,8 @@
 
   import { StartConversion, CancelConversion, GetVideoDuration } from "../bindings/ffmpeg-gui/backend/ffmpegservice";
   import { Print } from "../bindings/ffmpeg-gui/backend/tools";
+
+  type DialogType = "info" | "error" | "warning";
 
   let ffmpegPath = "/opt/homebrew/bin/ffmpeg";
   let inputPath = "";
@@ -110,7 +112,7 @@
     } catch (error) {
       videoDuration = 0;
       videoDurationText = "";
-      logText += `\n取得影片長度失敗：${String(error)}`;
+      logText += `\n${String(error)}`;
     }
   }
 
@@ -197,12 +199,31 @@
       logText += `${result.message}`;
       await _scrollLogToBottom();
     } catch (error) {
-      logText += `\n----- 轉換失敗 -----\n${String(error)}`;
+      Print(String(error))
+      dialog("error", "錯誤", String(error))
+      logText += `\n\n----- 轉換失敗 -----\n${String(error)}`;
       await _scrollLogToBottom();
     } finally {
       converting = false;
       cancelling = false;
     }
+  }
+
+  async function dialog(type: DialogType, title: string, message: string) {
+
+    switch (type) {
+        case "info":
+          await Dialogs.Info({ Title: title, Message: message });
+          break;
+        case "error":
+          await Dialogs.Error({ Title: title, Message: message });
+          break;
+        case "warning":
+          await Dialogs.Warning({ Title: title, Message: message });
+          break;
+        default:
+          await Dialogs.Info({ Title: title, Message: message });
+      }
   }
 
   /**
@@ -232,16 +253,6 @@
       logText += `\n取消失敗：${String(error)}\n`;
       await _scrollLogToBottom();
     }
-  }
-
-  /**
-   * 將前端的日誌訊息傳送到 Go 後端，由後端印到終端
-   * 對應後端：backend.Tools.Print(log any)
-   *
-   * @param log - 要印出的訊息（字串或物件皆可）
-   */
-  function print(log: any) {
-    Print(log)
   }
 
   /**
@@ -366,7 +377,7 @@
         <FilePathInput value={inputPath} />
         <OutputFormatSelect bind:value={container} disabled={converting} />
         <VideoCodecSelect bind:value={videoCodec} disabled={converting} />
-        <ConvertButton {converting} {cancelling} hasInput={Boolean(inputPath)} onclick={handleConvertButton} />
+        <ConvertButton {videoDuration} {converting} {cancelling} hasInput={Boolean(inputPath)} onclick={handleConvertButton} />
       </div>
 
       <div class="options-grid">
