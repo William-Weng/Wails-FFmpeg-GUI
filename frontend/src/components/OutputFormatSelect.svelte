@@ -9,6 +9,7 @@
         Containers.MP3,
         Containers.AAC,
         Containers.OGG,
+        Containers.OPUS,
     ];
 
     let { value = $bindable<Container>(containers[0]), disabled = false } = $props();

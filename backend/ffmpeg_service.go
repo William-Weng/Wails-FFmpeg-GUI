@@ -84,9 +84,6 @@ func (service *FFmpegService) DetectMediaType(ffmpegPath string, inputPath strin
 		return "", err
 	}
 
-	print("isVideo = %t", isVideo)
-	print("isAudio = %t", isAudio)
-
 	if isVideo {
 		return "video", nil
 	}

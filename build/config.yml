@@ -8,10 +8,10 @@ info:
   companyName: "William Weng"
   productName: "FFmpeg GUI"
   productIdentifier: "idv.williamweng.wailsffmpeggui"
-  description: "使用 FFmpeg 的跨平台影片格式轉換工具"
+  description: "使用 FFmpeg 的跨平台影音格式轉換工具"
   copyright: "Copyright © 2026, William Weng"
   comments: "Built with Wails, Go, Svelte and FFmpeg"
-  version: "0.2.1"
+  version: "0.3.0"
 
 dev_mode:
   root_path: .

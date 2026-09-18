@@ -1,12 +1,12 @@
 {
 	"fixed": {
-		"file_version": "0.2.1"
+		"file_version": "0.3.0"
 	},
 	"info": {
 		"0000": {
-			"ProductVersion": "0.2.1",
+			"ProductVersion": "0.3.0",
 			"CompanyName": "William Weng",
-			"FileDescription": "使用 FFmpeg 的跨平台影片格式轉換工具",
+			"FileDescription": "使用 FFmpeg 的跨平台影音格式轉換工具",
 			"LegalCopyright": "Copyright © 2026, William Weng",
 			"ProductName": "FFmpeg GUI",
 			"Comments": "Built with Wails, Go, Svelte and FFmpeg"

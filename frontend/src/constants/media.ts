@@ -5,6 +5,7 @@ export const Containers = {
     MP3: "mp3",
     AAC: "aac",
     OGG: "ogg",
+    OPUS: "opus",
 } as const;
 
 export const VideoCodecs = {

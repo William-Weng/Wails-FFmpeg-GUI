@@ -6,11 +6,11 @@
 name: "FFmpeg-GUI"
 arch: ${GOARCH}
 platform: "linux"
-version: "0.2.1"
+version: "0.3.0"
 section: "default"
 priority: "extra"
 maintainer: ${GIT_COMMITTER_NAME} <${GIT_COMMITTER_EMAIL}>
-description: "使用 FFmpeg 的跨平台影片格式轉換工具"
+description: "使用 FFmpeg 的跨平台影音格式轉換工具"
 vendor: "William Weng"
 homepage: "https://wails.io"
 license: "MIT"

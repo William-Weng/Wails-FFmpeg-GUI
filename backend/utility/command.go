@@ -13,6 +13,16 @@ import (
 	"time"
 )
 
+var supportedMediaTypes = map[string]struct{}{
+	"mp4":  {},
+	"ts":   {},
+	"mkv":  {},
+	"mp3":  {},
+	"aac":  {},
+	"ogg":  {},
+	"opus": {},
+}
+
 // 建立 FFmpeg 命令的標準輸入與標準錯誤輸出管道
 //   - stdin 可用來向 FFmpeg 傳送控制指令，例如 "q\n"
 //   - stderr 可用來讀取 FFmpeg 的進度資訊與錯誤訊息
@@ -70,11 +80,7 @@ func BuildFFmpegArguments(options ConversionOptions, outputPath string) ([]strin
 
 		durationSeconds := endSeconds - startSeconds
 		if durationSeconds <= 0 {
-			return nil, fmt.Errorf(
-				"結束時間必須大於開始時間：開始=%s，結束=%s",
-				options.StartTime,
-				options.EndTime,
-			)
+			return nil, fmt.Errorf("結束時間必須大於開始時間：開始=%s，結束=%s", options.StartTime, options.EndTime)
 		}
 
 		args = append(args, "-t", FormatTimestamp(durationSeconds))
@@ -83,6 +89,28 @@ func BuildFFmpegArguments(options ConversionOptions, outputPath string) ([]strin
 	args = append(args, "-i", options.InputPath)
 
 	codec := strings.ToLower(strings.TrimSpace(options.VideoCodec))
+	container := strings.ToLower(strings.TrimSpace(options.Container))
+
+	switch container {
+	case "mp3", "aac", "ogg", "opus":
+		args = combineAudioArguments(container, args)
+	default:
+		args = combineVideoArguments(options, codec, args)
+	}
+
+	args = append(args, outputPath)
+	return args, nil
+}
+
+// 根據指定的影片 codec 與轉換選項，組合 FFmpeg 的影片／音訊轉檔參數
+//
+//   - options：轉換設定，例如是否調整尺寸、目標寬度與高度
+//   - codec：影片編碼模式，目前支援 "copy"、"h264"、"h265"
+//   - args：目前已建立的 FFmpeg 參數；本函式會將新參數 append 到其中
+//
+// 回傳值：
+//   - 已加入影片處理參數的 args
+func combineVideoArguments(options ConversionOptions, codec string, args []string) []string {
 
 	switch codec {
 	case "copy":
@@ -117,9 +145,56 @@ func BuildFFmpegArguments(options ConversionOptions, outputPath string) ([]strin
 		args = append(args, "-c:v", "libx264", "-c:a", "aac")
 	}
 
-	args = append(args, outputPath)
+	return args
+}
 
-	return args, nil
+// 根據輸出音訊容器，將對應的 FFmpeg 音訊轉檔參數追加到 args
+func combineAudioArguments(container string, args []string) []string {
+
+	args = append(
+		args,
+		"-vn",
+		"-map", "0:a:0?",
+	)
+
+	switch container {
+	case "mp3":
+		args = append(
+			args,
+			"-c:a", "libmp3lame",
+			"-q:a", "2",
+		)
+
+	case "aac":
+		args = append(
+			args,
+			"-c:a", "aac",
+			"-b:a", "192k",
+		)
+
+	case "ogg":
+		args = append(
+			args,
+			"-c:a", "libvorbis",
+			"-q:a", "5",
+		)
+
+	case "opus":
+		args = append(
+			args,
+			"-c:a", "libopus",
+			"-b:a", "128k",
+		)
+
+	default:
+		args = append(
+			args,
+			"-c:a", "aac",
+			"-b:a", "192k",
+		)
+	}
+
+	return args
 }
 
 // DetectMediaDuration 使用 ffprobe 取得媒體檔案的總時長
@@ -191,8 +266,6 @@ func DetectMediaType(ffprobePath, filePath string) (hasVideo bool, hasAudio bool
 		if hasVideo && hasAudio {
 			break
 		}
-
-		fmt.Printf("CodecType = %s\n", stream.CodecType)
 	}
 
 	return hasVideo, hasAudio, nil
@@ -219,12 +292,11 @@ func MakeOutputPath(inputPath string, container string) string {
 func NormalizeContainer(value string) string {
 
 	value = strings.TrimSpace(strings.ToLower(value))
-	value = strings.TrimPrefix(value, ".")
+	value = strings.TrimLeft(value, ".")
 
-	switch value {
-	case "mkv", "ts":
+	if _, found := supportedMediaTypes[value]; found {
 		return value
-	default:
-		return "mp4"
 	}
+
+	return "mp4"
 }

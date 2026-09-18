@@ -22,7 +22,7 @@ func main() {
 
 	// 2. 建立 Wails v3 應用程式並綁定服務
 	app = application.New(application.Options{
-		Name: "影片格式轉換器",
+		Name: "影音格式轉換器",
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
 		},

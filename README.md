@@ -7,7 +7,7 @@
 ![Tag](https://img.shields.io/github/v/tag/William-Weng/Wails-FFmpeg-GUI?style=flat&label=Tag)
 ![Stars](https://img.shields.io/github/stars/William-Weng/Wails-FFmpeg-GUI?style=flat&label=Stars)
 
-一個使用 Wails 3、Go、Svelte 5 與 FFmpeg 製作的跨平台影片格式轉換工具。
+一個使用 Wails 3、Go、Svelte 5 與 FFmpeg 製作的跨平台影音格式轉換工具。
 
 目前主要以 macOS 開發與測試，提供 FFmpeg 指令預覽、複製與影片轉換功能，方便在圖形化介面與 Terminal 指令之間切換。
 
