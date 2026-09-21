@@ -122,7 +122,7 @@
    *
    * @param event - 事件物件（通常來自 Events 系統）
    */
-  async function videoFileDroppedAction(event: unknown): Promise<void> {
+  async function videoFileDroppedAction(event: Events.WailsEvent): Promise<void> {
 
     const files = _getEventData<string[]>(event);
 
@@ -161,7 +161,7 @@
    *
    * @param event - 來自 Events 系統的事件物件，負載為 FFmpegOutput
    */
-  async function ffmpegOutputAction(event: unknown): Promise<void> {
+  async function ffmpegOutputAction(event: Events.WailsEvent): Promise<void> {
     const output = _getEventData<FFmpegOutput>(event);
 
     if (!output || typeof output.line !== "string") { return; }
@@ -179,7 +179,7 @@
    * - percent：目前轉換百分比
    * - 這裡只使用 percent 更新 UI 的進度條，並將數值限制為 0～100，避免因 FFmpeg 最後 timestamp、浮點數誤差或異常資料，造成 progress element 收到負數或超過 100 的數值
    */
-  function ffmpegProgressAction(event: unknown) {
+  function ffmpegProgressAction(event: Events.WailsEvent) {
     const data = _getEventData<FFmpegProgress>(event);
     progress = Math.min(100, Math.max(0, data.percent));
   }
@@ -370,7 +370,7 @@
    * @param event - 事件物件或任意值
    * @returns 解包後的資料，型別為 T
    */
-  function _getEventData<T>(event: unknown): T {
+  function _getEventData<T>(event: Events.WailsEvent): T {
     if (event !== null && typeof event === "object" && "data" in event) {
       return (event as { data: T }).data;
     }
