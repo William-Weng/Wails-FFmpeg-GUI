@@ -294,6 +294,17 @@
   }
 
   /**
+   * 將日誌區域捲動到最底部
+   *  - 先等待 DOM 更新（tick），再設定 scrollTop
+   */
+  async function _scrollLogToBottom(): Promise<void> {
+    await tick();
+    if (!logElement) { return; }
+
+    logElement.scrollTop = logElement.scrollHeight;
+  }
+
+  /**
    * 檢查轉檔前的必要輸入是否正確
    * @param inputPath - 輸入影片路徑
    * @param ffmpegPath - FFmpeg 執行檔路徑
@@ -413,17 +424,6 @@
    */
   function _disableCtrlWheel(event: WheelEvent) {
     if (event.ctrlKey) { event.preventDefault(); }
-  }
-
-  /**
-   * 將日誌區域捲動到最底部
-   *  - 先等待 DOM 更新（tick），再設定 scrollTop
-   */
-  async function _scrollLogToBottom(): Promise<void> {
-    await tick();
-    if (!logElement) { return; }
-
-    logElement.scrollTop = logElement.scrollHeight;
   }
 </script>
 
