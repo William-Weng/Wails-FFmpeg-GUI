@@ -8,8 +8,10 @@ import (
 	"io"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -206,7 +208,7 @@ func combineAudioArguments(container string, args []string) []string {
 //   - err：ffprobe 執行失敗、輸出無法轉為秒數，或取得非正時長時的錯誤。
 func DetectMediaDuration(context context.Context, ffprobePath string, inputPath string) (duration float64, err error) {
 
-	command := exec.CommandContext(
+	cmd := exec.CommandContext(
 		context,
 		ffprobePath,
 		"-v", "error",
@@ -215,7 +217,9 @@ func DetectMediaDuration(context context.Context, ffprobePath string, inputPath 
 		inputPath,
 	)
 
-	output, err := command.Output()
+	cmd = configureChildProcess(cmd)
+
+	output, err := cmd.Output()
 	if err != nil {
 		return 0, fmt.Errorf("ffprobe 執行失敗：%w", err)
 	}
@@ -233,6 +237,14 @@ func DetectMediaDuration(context context.Context, ffprobePath string, inputPath 
 	return duration, nil
 }
 
+func configureChildProcess(cmd *exec.Cmd) *exec.Cmd {
+	if runtime.GOOS == "windows" {
+		cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	}
+
+	return cmd
+}
+
 // DetectMediaType 使用 ffprobe 判斷輸入檔是否有視訊軌與音訊軌。
 // 回傳：hasVideo, hasAudio, error
 func DetectMediaType(ffprobePath, filePath string) (hasVideo bool, hasAudio bool, err error) {
@@ -245,6 +257,8 @@ func DetectMediaType(ffprobePath, filePath string) (hasVideo bool, hasAudio bool
 		"-show_streams",
 		filePath,
 	)
+
+	cmd = configureChildProcess(cmd)
 
 	out, err := cmd.Output()
 	if err != nil {

@@ -5,7 +5,9 @@ import (
 	"errors"
 	"ffmpeg-gui/backend/utility"
 	util "ffmpeg-gui/backend/utility"
+	"runtime"
 	"sync"
+	"syscall"
 
 	"fmt"
 	"io"
@@ -437,7 +439,17 @@ func (service *FFmpegService) buildFFmpegCommand(options utility.ConversionOptio
 	}
 
 	command := exec.CommandContext(service.commandContext(), ffmpegPath, args...)
+	command = configureChildProcess(command)
+
 	return command, outputPath, nil
+}
+
+func configureChildProcess(cmd *exec.Cmd) *exec.Cmd {
+	if runtime.GOOS == "windows" {
+		cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	}
+
+	return cmd
 }
 
 // 啟動並等待 FFmpeg 命令完成
