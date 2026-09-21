@@ -1,5 +1,12 @@
 package utility
 
+// AppConfig 定義應用程式需要持久化儲存的設定資料
+// 最後會儲存為：
+// { "ffmpegPath": "/opt/homebrew/bin/ffmpeg" }
+type AppConfig struct {
+	FFmpegPath string `json:"ffmpegPath"` // FFmpeg 可執行檔的完整路徑。
+}
+
 // FFmpegOutput 表示 FFmpeg 輸出的單行文字；通常會將 FFmpeg 的標準輸出或錯誤輸出逐行傳送給前端
 type FFmpegOutput struct {
 	Line string `json:"line"` // Line 儲存 FFmpeg 輸出的內容；`json:"line"` 表示轉換成 JSON 時，欄位名稱會是 "line"

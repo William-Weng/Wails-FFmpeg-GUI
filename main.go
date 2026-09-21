@@ -9,6 +9,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/events"
 )
 
+//go:embed all:frontend/dist
 var assets embed.FS
 
 func main() {
@@ -18,6 +19,11 @@ func main() {
 	// 1. 初始化服務實體
 	ffmpegService := backend.NewFFmpegService()
 	tools := backend.NewTools()
+	configService, err := backend.NewConfigService("Wails-FFMpeg-GUI")
+
+	if err != nil {
+		println(err.Error())
+	}
 
 	// 2. 建立 Wails v3 應用程式並綁定服務
 	app = application.New(application.Options{
@@ -28,6 +34,7 @@ func main() {
 		Services: []application.Service{
 			application.NewService(ffmpegService),
 			application.NewService(tools),
+			application.NewService(configService),
 		},
 		Mac: application.MacOptions{
 			ApplicationShouldTerminateAfterLastWindowClosed: true,
@@ -58,7 +65,7 @@ func main() {
 	})
 
 	// 4. 啟動應用程式
-	err := app.Run()
+	err = app.Run()
 	if err != nil {
 		println(err.Error())
 	}

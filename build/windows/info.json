@@ -1,10 +1,10 @@
 {
 	"fixed": {
-		"file_version": "0.3.1"
+		"file_version": "0.3.2"
 	},
 	"info": {
 		"0000": {
-			"ProductVersion": "0.3.1",
+			"ProductVersion": "0.3.2",
 			"CompanyName": "William Weng",
 			"FileDescription": "使用 FFmpeg 的跨平台影音格式轉換工具",
 			"LegalCopyright": "Copyright © 2026, William Weng",

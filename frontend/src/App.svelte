@@ -17,10 +17,11 @@
 
   import { StartConversion, CancelConversion, GetVideoDuration, DetectMediaType } from "../bindings/ffmpeg-gui/backend/ffmpegservice";
   import { Print } from "../bindings/ffmpeg-gui/backend/tools";
+  import { GetFFmpegPath, SetFFmpegPath } from "../bindings/ffmpeg-gui/backend/configservice";
 
   type DialogType = "info" | "error" | "warning";
 
-  let ffmpegPath = "/opt/homebrew/bin/ffmpeg";
+  let ffmpegPath = "ffmpeg";
   let inputPath = "";
   let container: Container = Containers.MP4
   let videoCodec: VideoCodec = VideoCodecs.Copy
@@ -43,6 +44,27 @@
 
   let logText = "請拖放影片檔案到上方區域";
   let logElement: HTMLElement | null = null;
+
+  async function saveFFmpegPath(path: string) {
+    try {
+      await SetFFmpegPath(path);
+      console.log("FFmpeg 路徑已儲存");
+    } catch (error) {
+      console.error("儲存 FFmpeg 路徑失敗", error);
+    }
+  }
+
+  async function loadFFmpegPath() {
+  try {
+    const path = await GetFFmpegPath();
+
+    if (path) {
+      ffmpegPath = path;
+    }
+  } catch (error) {
+    console.error("讀取 FFmpeg 路徑失敗", error);
+  }
+}
 
   /**
    * 元件掛載時註冊 Wails 事件監聽器：
@@ -78,7 +100,9 @@
     const unsubscribeFFmpegCompleted = Events.On(FFmpegEventType.Completed, (_) => {
       progress = 100.0
     });
-    
+
+    loadFFmpegPath()
+
     window.addEventListener('wheel', (event) => { _disableCtrlWheel(event) }, { passive: false });
     window.addEventListener('keydown', (event) => { _disableZoomKey(event) }, { passive: false });
 
@@ -115,7 +139,7 @@
   }
 
   /**
-   * 處理「影片檔案拖放完成」事件的回調函式
+   * 處理「影片檔案拖放完成」事件的回調函式 + 
    * - 從事件中解出 string[] 類型的檔案路徑陣列
    * - 若陣列非空，則將第一個路徑設為 inputPath 並更新日誌
    * - 若無有效路徑，則顯示錯誤訊息
@@ -135,6 +159,7 @@
 
     inputPath = files[0];
     logText = `已成功選擇媒體：${inputPath}`;
+    saveFFmpegPath(ffmpegPath)
 
     try {
       videoDuration = await GetVideoDuration(ffmpegPath, inputPath);
