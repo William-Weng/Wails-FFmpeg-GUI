@@ -45,27 +45,6 @@
   let logText = "請拖放影片檔案到上方區域";
   let logElement: HTMLElement | null = null;
 
-  async function saveFFmpegPath(path: string) {
-    try {
-      await SetFFmpegPath(path);
-      console.log("FFmpeg 路徑已儲存");
-    } catch (error) {
-      console.error("儲存 FFmpeg 路徑失敗", error);
-    }
-  }
-
-  async function loadFFmpegPath() {
-  try {
-    const path = await GetFFmpegPath();
-
-    if (path) {
-      ffmpegPath = path;
-    }
-  } catch (error) {
-    console.error("讀取 FFmpeg 路徑失敗", error);
-  }
-}
-
   /**
    * 元件掛載時註冊 Wails 事件監聽器：
    *
@@ -290,6 +269,42 @@
       cancelling = false;
       logText += `\n取消失敗：${String(error)}\n`;
       await _scrollLogToBottom();
+    }
+  }
+
+  /**
+   * 儲存 FFmpeg 執行檔路徑
+   *
+   * 通常在使用者透過檔案選擇器選到 ffmpeg 執行檔，或手動修改路徑後呼叫
+   *
+   * @param path - FFmpeg 執行檔的本機絕對路徑。
+   *               macOS / Linux 例如：/usr/local/bin/ffmpeg
+   *               Windows 例如：C:\tools\ffmpeg\bin\ffmpeg.exe
+   */
+  async function saveFFmpegPath(path: string) {
+    try {
+      await SetFFmpegPath(path);
+      Print("FFmpeg 路徑已儲存");
+    } catch (error) {
+      Print(`儲存 FFmpeg 路徑失敗: ${error}`);
+    }
+  }
+
+  /**
+   * 載入已儲存的 FFmpeg 執行檔路徑。
+   *
+   * 通常在 App.svelte 的 onMount() 執行，
+   * 讓應用程式啟動時自動還原上次選擇的 FFmpeg 路徑。
+   */
+  async function loadFFmpegPath() {
+    try {
+      const path = await GetFFmpegPath();
+
+      if (path) {
+        ffmpegPath = path;
+      }
+    } catch (error) {
+      Print(`讀取 FFmpeg 路徑失敗: ${error}`);
     }
   }
 
