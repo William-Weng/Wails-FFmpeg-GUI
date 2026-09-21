@@ -24,7 +24,7 @@ https://github.com/user-attachments/assets/f3506a5a-b0a6-455b-8476-b134e6e7e833
 - Svelte 5 frontend 負責表單狀態與操作介面。
 - 使用 Less 管理前端樣式。
 
-## 技術架構
+## [技術架構](https://v3.wails.io/features/drag-and-drop/files/)
 
 ```text
 Svelte 5 + Less
