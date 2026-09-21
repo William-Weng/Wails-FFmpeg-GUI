@@ -185,7 +185,7 @@ gofmt -w *.go
 build/appicon.png
 ```
 
-## Wails Tasks
+## [Wails Tasks](https://v3.wails.io/guides/build/cross-platform/)
 
 列出可用 tasks：
 
@@ -197,6 +197,7 @@ wails3 task --list
 
 ```bash
 wails3 task setup:docker
+wails3 task setup:docker PLATFORM=linux/amd64
 ```
 
 建立 Windows amd64：

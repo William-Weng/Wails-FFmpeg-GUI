@@ -115,30 +115,6 @@
   });
 
   /**
-   * 攔截鍵盤事件，禁止使用者用 Ctrl/Cmd + +/-/0 進行頁面縮放。
-   * 適用於 Wails 前端（或其他 webview），搭配 CSS touch-action: none 一起使用，
-   * 可以大幅壓制桌面端常見的縮放快捷鍵。
-   */
-  function _disableZoomKey(event: KeyboardEvent) {
-
-    const isZoomControl = event.ctrlKey || event.metaKey;
-    const isZoomKey = event.key === '+' || event.key === '-' || event.key === '0' || event.key === '=';
-
-    if (isZoomControl && isZoomKey) {
-      event.preventDefault();
-    }
-  }
-
-  /**
-   * 攔截滾輪事件，禁止使用者用 Ctrl + 滾輪進行頁面縮放。
-   * 適用於桌面端瀏覽器 / webview（包含 Wails），搭配 CSS touch-action: none
-   * 與鍵盤縮放攔截一起使用，可大幅壓制常見的縮放操作。
-   */
-  function _disableCtrlWheel(event: WheelEvent) {
-    if (event.ctrlKey) { event.preventDefault(); }
-  }
-
-  /**
    * 處理「影片檔案拖放完成」事件的回調函式 + 
    * - 從事件中解出 string[] 類型的檔案路徑陣列
    * - 若陣列非空，則將第一個路徑設為 inputPath 並更新日誌
@@ -269,20 +245,22 @@
     }
   }
 
+  /**
+   * 顯示原生系統對話框
+   *
+   *  - 依照傳入的 type 決定要顯示一般提示、錯誤或警告對話框；title 會顯示在對話框標題，message 則是對話框內容
+   *
+   * @param type 對話框類型：info、error 或 warning
+   * @param title 對話框標題
+   * @param message 對話框顯示的訊息內容
+   */
   async function dialog(type: DialogType, title: string, message: string) {
 
     switch (type) {
-        case "info":
-          await Dialogs.Info({ Title: title, Message: message });
-          break;
-        case "error":
-          await Dialogs.Error({ Title: title, Message: message });
-          break;
-        case "warning":
-          await Dialogs.Warning({ Title: title, Message: message });
-          break;
-        default:
-          await Dialogs.Info({ Title: title, Message: message });
+        case "info": await Dialogs.Info({ Title: title, Message: message }); break;
+        case "error": await Dialogs.Error({ Title: title, Message: message }); break;
+        case "warning": await Dialogs.Warning({ Title: title, Message: message }); break;
+        default: await Dialogs.Info({ Title: title, Message: message });
       }
   }
 
@@ -411,6 +389,30 @@
       minutes.toString().padStart(2, "0"),
       seconds.toString().padStart(2, "0"),
     ].join(":");
+  }
+
+  /**
+   * 攔截鍵盤事件，禁止使用者用 Ctrl/Cmd + +/-/0 進行頁面縮放。
+   * 適用於 Wails 前端（或其他 webview），搭配 CSS touch-action: none 一起使用，
+   * 可以大幅壓制桌面端常見的縮放快捷鍵。
+   */
+  function _disableZoomKey(event: KeyboardEvent) {
+
+    const isZoomControl = event.ctrlKey || event.metaKey;
+    const isZoomKey = event.key === '+' || event.key === '-' || event.key === '0' || event.key === '=';
+
+    if (isZoomControl && isZoomKey) {
+      event.preventDefault();
+    }
+  }
+
+  /**
+   * 攔截滾輪事件，禁止使用者用 Ctrl + 滾輪進行頁面縮放。
+   * 適用於桌面端瀏覽器 / webview（包含 Wails），搭配 CSS touch-action: none
+   * 與鍵盤縮放攔截一起使用，可大幅壓制常見的縮放操作。
+   */
+  function _disableCtrlWheel(event: WheelEvent) {
+    if (event.ctrlKey) { event.preventDefault(); }
   }
 
   /**
