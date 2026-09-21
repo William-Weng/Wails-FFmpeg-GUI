@@ -9,7 +9,6 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/events"
 )
 
-//go:embed all:frontend/dist
 var assets embed.FS
 
 func main() {
@@ -39,12 +38,13 @@ func main() {
 
 	// 3. 核心修正：使用 v3 最新 API 建立視窗
 	app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title:          "影片格式轉換器",
+		Title:          "影音格式轉換器",
 		Width:          800,
 		Height:         600,
 		MinWidth:       600,
 		MinHeight:      500,
 		EnableFileDrop: true, // 開啟檔案拖放
+		DisableResize:  true, // 禁止視窗更新大小
 		URL:            "/",
 	}).OnWindowEvent(events.Common.WindowFilesDropped, func(event *application.WindowEvent) {
 		// 當使用者拖放檔案進視窗時觸發

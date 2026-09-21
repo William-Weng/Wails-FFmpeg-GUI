@@ -78,6 +78,9 @@
     const unsubscribeFFmpegCompleted = Events.On(FFmpegEventType.Completed, (_) => {
       progress = 100.0
     });
+    
+    window.addEventListener('wheel', (event) => { _disableCtrlWheel(event) }, { passive: false });
+    window.addEventListener('keydown', (event) => { _disableZoomKey(event) }, { passive: false });
 
     return () => {
       unsubscribeDrop();
@@ -86,6 +89,30 @@
       unsubscribeFFmpegCompleted();
     };
   });
+
+  /**
+   * 攔截鍵盤事件，禁止使用者用 Ctrl/Cmd + +/-/0 進行頁面縮放。
+   * 適用於 Wails 前端（或其他 webview），搭配 CSS touch-action: none 一起使用，
+   * 可以大幅壓制桌面端常見的縮放快捷鍵。
+   */
+  function _disableZoomKey(event: KeyboardEvent) {
+
+    const isZoomControl = event.ctrlKey || event.metaKey;
+    const isZoomKey = event.key === '+' || event.key === '-' || event.key === '0' || event.key === '=';
+
+    if (isZoomControl && isZoomKey) {
+      event.preventDefault();
+    }
+  }
+
+  /**
+   * 攔截滾輪事件，禁止使用者用 Ctrl + 滾輪進行頁面縮放。
+   * 適用於桌面端瀏覽器 / webview（包含 Wails），搭配 CSS touch-action: none
+   * 與鍵盤縮放攔截一起使用，可大幅壓制常見的縮放操作。
+   */
+  function _disableCtrlWheel(event: WheelEvent) {
+    if (event.ctrlKey) { event.preventDefault(); }
+  }
 
   /**
    * 處理「影片檔案拖放完成」事件的回調函式

@@ -38,7 +38,7 @@ Go service
 FFmpeg
 ```
 
-## [作業環境](https://v3.wails.io/zh-tw/concepts/build-system/)
+## [作業環境](https://v3.wails.io/zh-tw/tutorials/01-creating-a-service/)
 
 | 項目 | 版本 |
 | --- | --- |
@@ -117,6 +117,7 @@ cd ..
 
 ```bash
 wails3 dev
+wails3 generate bindings
 ```
 
 若需要查詢或終止佔用開發 port 的程序：
