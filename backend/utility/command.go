@@ -8,10 +8,8 @@ import (
 	"io"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -102,6 +100,114 @@ func BuildFFmpegArguments(options ConversionOptions, outputPath string) ([]strin
 
 	args = append(args, outputPath)
 	return args, nil
+}
+
+// DetectMediaDuration 使用 ffprobe 取得媒體檔案的總時長
+//   - ffprobePath：ffprobe 執檔的完整路徑
+//   - inputPath：要讀取資訊的影音檔案路徑
+//
+// 回傳:
+//   - duration：媒體總長度，單位為秒，例如 125.45 代表 2 分 5.45 秒。
+//   - err：ffprobe 執行失敗、輸出無法轉為秒數，或取得非正時長時的錯誤。
+func DetectMediaDuration(context context.Context, ffprobePath string, inputPath string) (duration float64, err error) {
+
+	cmd := exec.CommandContext(
+		context,
+		ffprobePath,
+		"-v", "error",
+		"-show_entries", "format=duration",
+		"-of", "default=noprint_wrappers=1:nokey=1",
+		inputPath,
+	)
+
+	cmd = ConfigureChildProcess(cmd)
+
+	output, err := cmd.Output()
+	if err != nil {
+		return 0, fmt.Errorf("ffprobe 執行失敗：%w", err)
+	}
+
+	duration, err = strconv.ParseFloat(strings.TrimSpace(string(output)), 64)
+
+	if err != nil {
+		return 0, fmt.Errorf("無法解析影片長度：%w", err)
+	}
+
+	if duration <= 0 {
+		return 0, errors.New("影片長度必須大於 0")
+	}
+
+	return duration, nil
+}
+
+// DetectMediaType 使用 ffprobe 判斷輸入檔是否有視訊軌與音訊軌。
+// 回傳：hasVideo, hasAudio, error
+func DetectMediaType(ffprobePath, filePath string) (hasVideo bool, hasAudio bool, err error) {
+
+	// 執行 ffprobe
+	cmd := exec.Command(
+		ffprobePath,
+		"-v", "quiet",
+		"-print_format", "json",
+		"-show_streams",
+		filePath,
+	)
+
+	cmd = ConfigureChildProcess(cmd)
+
+	out, err := cmd.Output()
+	if err != nil {
+		return false, false, fmt.Errorf("ffprobe failed: %w", err)
+	}
+
+	var result FFprobeResult
+	if err := json.Unmarshal(out, &result); err != nil {
+		return false, false, fmt.Errorf("parse ffprobe json failed: %w", err)
+	}
+
+	for _, stream := range result.Streams {
+		switch stream.CodecType {
+		case "video":
+			hasVideo = true
+		case "audio":
+			hasAudio = true
+		}
+		if hasVideo && hasAudio {
+			break
+		}
+	}
+
+	return hasVideo, hasAudio, nil
+}
+
+// 會根據輸入檔案路徑與容器格式，產生新的輸出檔案路徑；輸出檔案會保留原始檔案所在的資料夾與檔名，並在副檔名前加入時間戳記
+//
+// 例如：
+//
+//	inputPath: "/Users/me/Videos/movie.mov"
+//	container: "mp4"
+//
+//	輸出："/Users/me/Videos/movie_20260915-102700.123.mp4"
+func MakeOutputPath(inputPath string, container string) string {
+
+	extension := filepath.Ext(inputPath)
+	base := strings.TrimSuffix(inputPath, extension)
+	timestamp := time.Now().Format("20060102-150405.000")
+
+	return fmt.Sprintf("%s_%s.%s", base, timestamp, container)
+}
+
+// 去除前後空白，並將英文字母轉成小寫；例如： ".MP4"  -> "mp4"
+func NormalizeContainer(value string) string {
+
+	value = strings.TrimSpace(strings.ToLower(value))
+	value = strings.TrimLeft(value, ".")
+
+	if _, found := supportedMediaTypes[value]; found {
+		return value
+	}
+
+	return "mp4"
 }
 
 // 根據指定的影片 codec 與轉換選項，組合 FFmpeg 的影片／音訊轉檔參數
@@ -197,120 +303,4 @@ func combineAudioArguments(container string, args []string) []string {
 	}
 
 	return args
-}
-
-// DetectMediaDuration 使用 ffprobe 取得媒體檔案的總時長
-//   - ffprobePath：ffprobe 執檔的完整路徑
-//   - inputPath：要讀取資訊的影音檔案路徑
-//
-// 回傳:
-//   - duration：媒體總長度，單位為秒，例如 125.45 代表 2 分 5.45 秒。
-//   - err：ffprobe 執行失敗、輸出無法轉為秒數，或取得非正時長時的錯誤。
-func DetectMediaDuration(context context.Context, ffprobePath string, inputPath string) (duration float64, err error) {
-
-	cmd := exec.CommandContext(
-		context,
-		ffprobePath,
-		"-v", "error",
-		"-show_entries", "format=duration",
-		"-of", "default=noprint_wrappers=1:nokey=1",
-		inputPath,
-	)
-
-	cmd = configureChildProcess(cmd)
-
-	output, err := cmd.Output()
-	if err != nil {
-		return 0, fmt.Errorf("ffprobe 執行失敗：%w", err)
-	}
-
-	duration, err = strconv.ParseFloat(strings.TrimSpace(string(output)), 64)
-
-	if err != nil {
-		return 0, fmt.Errorf("無法解析影片長度：%w", err)
-	}
-
-	if duration <= 0 {
-		return 0, errors.New("影片長度必須大於 0")
-	}
-
-	return duration, nil
-}
-
-func configureChildProcess(cmd *exec.Cmd) *exec.Cmd {
-	if runtime.GOOS == "windows" {
-		cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
-	}
-
-	return cmd
-}
-
-// DetectMediaType 使用 ffprobe 判斷輸入檔是否有視訊軌與音訊軌。
-// 回傳：hasVideo, hasAudio, error
-func DetectMediaType(ffprobePath, filePath string) (hasVideo bool, hasAudio bool, err error) {
-
-	// 執行 ffprobe
-	cmd := exec.Command(
-		ffprobePath,
-		"-v", "quiet",
-		"-print_format", "json",
-		"-show_streams",
-		filePath,
-	)
-
-	cmd = configureChildProcess(cmd)
-
-	out, err := cmd.Output()
-	if err != nil {
-		return false, false, fmt.Errorf("ffprobe failed: %w", err)
-	}
-
-	var result FFprobeResult
-	if err := json.Unmarshal(out, &result); err != nil {
-		return false, false, fmt.Errorf("parse ffprobe json failed: %w", err)
-	}
-
-	for _, stream := range result.Streams {
-		switch stream.CodecType {
-		case "video":
-			hasVideo = true
-		case "audio":
-			hasAudio = true
-		}
-		if hasVideo && hasAudio {
-			break
-		}
-	}
-
-	return hasVideo, hasAudio, nil
-}
-
-// 會根據輸入檔案路徑與容器格式，產生新的輸出檔案路徑；輸出檔案會保留原始檔案所在的資料夾與檔名，並在副檔名前加入時間戳記
-//
-// 例如：
-//
-//	inputPath: "/Users/me/Videos/movie.mov"
-//	container: "mp4"
-//
-//	輸出："/Users/me/Videos/movie_20260915-102700.123.mp4"
-func MakeOutputPath(inputPath string, container string) string {
-
-	extension := filepath.Ext(inputPath)
-	base := strings.TrimSuffix(inputPath, extension)
-	timestamp := time.Now().Format("20060102-150405.000")
-
-	return fmt.Sprintf("%s_%s.%s", base, timestamp, container)
-}
-
-// 去除前後空白，並將英文字母轉成小寫；例如： ".MP4"  -> "mp4"
-func NormalizeContainer(value string) string {
-
-	value = strings.TrimSpace(strings.ToLower(value))
-	value = strings.TrimLeft(value, ".")
-
-	if _, found := supportedMediaTypes[value]; found {
-		return value
-	}
-
-	return "mp4"
 }

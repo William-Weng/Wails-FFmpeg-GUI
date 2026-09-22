@@ -11,7 +11,7 @@ info:
   description: "使用 FFmpeg 的跨平台影音格式轉換工具"
   copyright: "Copyright © 2026, William Weng"
   comments: "Built with Wails, Go, Svelte and FFmpeg"
-  version: "0.3.2"
+  version: "0.3.3"
 
 dev_mode:
   root_path: .

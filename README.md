@@ -157,7 +157,6 @@ ffmpeg -i input.mp4 -vf scale=1920:1080 -c:v libx264 output.mp4
 
 ```bash
 wails3 build GOOS=windows GOARCH=amd64
-FLAGS="-windowsconsole=false" wails3 task windows:build ARCH=amd64
 ```
 
 封裝 macOS Intel 版本：
