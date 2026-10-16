@@ -3,11 +3,11 @@ Version=1.0
 Name=FFmpeg GUI
 Comment=使用 FFmpeg 的跨平台影音格式轉換工具
 # The Exec line includes %u to pass the URL to the application
-Exec=/usr/local/bin/FFmpeg-GUI %u
+Exec=/usr/local/bin/ %u
 Terminal=false
 Type=Application
-Icon=FFmpeg-GUI
+Icon=
 Categories=Utility;
-StartupWMClass=FFmpeg-GUI
+StartupWMClass=
 
  

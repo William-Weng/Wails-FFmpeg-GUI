@@ -220,6 +220,8 @@ func NormalizeContainer(value string) string {
 //   - 已加入影片處理參數的 args
 func combineVideoArguments(options ConversionOptions, codec string, args []string) []string {
 
+	minimumSize := -3
+
 	switch codec {
 	case "copy":
 		if options.UseSize {
@@ -234,7 +236,7 @@ func combineVideoArguments(options ConversionOptions, codec string, args []strin
 		)
 
 	case "h264":
-		if options.UseSize && options.Width > 0 && options.Height > 0 {
+		if options.UseSize && options.Width > minimumSize && options.Height > minimumSize {
 			scale := fmt.Sprintf("scale=%d:%d", options.Width, options.Height)
 			args = append(args, "-vf", scale)
 		}
@@ -242,7 +244,7 @@ func combineVideoArguments(options ConversionOptions, codec string, args []strin
 		args = append(args, "-c:v", "libx264", "-c:a", "aac")
 
 	case "h265":
-		if options.UseSize && options.Width > 0 && options.Height > 0 {
+		if options.UseSize && options.Width > minimumSize && options.Height > minimumSize {
 			scale := fmt.Sprintf("scale=%d:%d", options.Width, options.Height)
 			args = append(args, "-vf", scale)
 		}

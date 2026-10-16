@@ -3,10 +3,10 @@
 #
 # The lines below are called `modelines`. See `:help modeline`
 
-name: "FFmpeg-GUI"
+name: ""
 arch: ${GOARCH}
 platform: "linux"
-version: "0.3.3"
+version: "0.3.4"
 section: "default"
 priority: "extra"
 maintainer: ${GIT_COMMITTER_NAME} <${GIT_COMMITTER_EMAIL}>
@@ -17,12 +17,12 @@ license: "MIT"
 release: "1"
 
 contents:
-  - src: "./bin/FFmpeg-GUI"
-    dst: "/usr/local/bin/FFmpeg-GUI"
+  - src: "./bin/"
+    dst: "/usr/local/bin/"
   - src: "./build/appicon.png"
-    dst: "/usr/share/icons/hicolor/128x128/apps/FFmpeg-GUI.png"
-  - src: "./build/linux/FFmpeg-GUI.desktop"
-    dst: "/usr/share/applications/FFmpeg-GUI.desktop"
+    dst: "/usr/share/icons/hicolor/128x128/apps/.png"
+  - src: "./build/linux/.desktop"
+    dst: "/usr/share/applications/.desktop"
 
 # Default dependencies for the GTK4 + WebKitGTK 6.0 stack (Ubuntu 24.04+ / Debian 13+)
 depends:

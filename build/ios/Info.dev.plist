@@ -5,7 +5,7 @@
 		<key>CFBundleDisplayName</key>
 		<string>FFmpeg GUI (Dev)</string>
 		<key>CFBundleExecutable</key>
-		<string>FFmpeg-GUI</string>
+		<string/>
 		<key>CFBundleGetInfoString</key>
 		<string>Built with Wails, Go, Svelte and FFmpeg</string>
 		<key>CFBundleIdentifier</key>
@@ -15,9 +15,9 @@
 		<key>CFBundlePackageType</key>
 		<string>APPL</string>
 		<key>CFBundleShortVersionString</key>
-		<string>0.3.3-dev</string>
+		<string>0.3.4-dev</string>
 		<key>CFBundleVersion</key>
-		<string>0.3.3</string>
+		<string>0.3.4</string>
 		<key>LSRequiresIPhoneOS</key>
 		<true/>
 		<key>MinimumOSVersion</key>
